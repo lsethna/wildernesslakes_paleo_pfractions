@@ -120,3 +120,5 @@ master_v1 <- dates_dmar_v2 %>%
   full_join(pfracs_v2) %>%
   full_join(pigments_v2)
 glimpse(master_v1)
+
+write.csv(master_v1,file="WL_paleo_masterdataset_10Sept2024.csv")
