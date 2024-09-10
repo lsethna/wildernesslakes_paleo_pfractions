@@ -3,6 +3,7 @@ library(janitor)
 library(ggplot2)
 library(tidyverse)
 library(dplyr)
+library(readxl)
 
 
 ######Load in data######
@@ -17,7 +18,26 @@ library(googlesheets4)
 googledrive::drive_auth()
 
 #load data in from your google drive
-bsi <- read_sheet("https://drive.google.com/drive/folders/1T1OwrQpbi3JoLwBleRM6tquK_7rX6rYP")
+#link to folder
+bsi <- googledrive::as_id("https://drive.google.com/drive/folders/1T1OwrQpbi3JoLwBleRM6tquK_7rX6rYP")
+
+# Identify needed data in the folder
+wanted_files <- googledrive::drive_ls(path = bsi) %>%
+  # Filter to only needed files
+  dplyr::filter(name %in% c("WL_BSi_all.xlsx"))
+
+# Create a folder to download data into
+dir.create(path = file.path("raw_data"), showWarnings = F)
+
+# Download that data
+purrr::walk2(.x = wanted_files$name, .y = wanted_files$id,
+             .f = ~ googledrive::drive_download(file = .y, overwrite = T,
+                                                path = file.path("raw_data", .x)))
+
+#import downloaded file from local drive
+getwd()
+bsi_dat <- read_excel("raw_data/WL_BSi_all.xlsx")
+glimpse(bsi_dat)
 
 #######Didn't work, keep trying to make it work######
 library(readr)
