@@ -4,7 +4,10 @@ library(ggplot2)
 library(tidyverse)
 library(dplyr)
 library(readxl)
+library(praise)
 
+#for the feels
+praise()
 
 ######Load in data######
 
