@@ -20,6 +20,7 @@ dates_dmar_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders
 loi_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/1WhQLgIDeu5N1SvcdrYztCWfjBdCb-HR_") #contains WL_LOI_allcores.xlsx
 pigment_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/1y-zoTHbMW9eBUMPLkWLC_P6Qvcw-n-yL") #raw pigment data, all cores WL_pigments_allcores.csv
 pfracs_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/11lWhi9zlPjE2PDnLIAPNbDnbVXrGAxQo") #Pfrac_mass_focuscorrect google sheet
+diatoms_url <- 
 
 # Identify needed data in the Drive
 wanted_files <- googledrive::drive_ls(path = bsi_url) %>%
@@ -33,6 +34,7 @@ wanted_files <- googledrive::drive_ls(path = bsi_url) %>%
                             "WL_LOI_allcores.xlsx",
                             "WL_pigments_allcores.csv",
                             "Pfrac_mass_focuscorrect" #saved as Google sheet, no file extension needed
+                            #add diatom data here
                             ))
 # Check those files
 wanted_files
@@ -51,6 +53,7 @@ dates_dmar <- read.csv("raw_data/sections_interp_year_dmar_30July2024.csv")
 loi <- read_excel("raw_data/WL_LOI_allcores.xlsx") %>% janitor::clean_names()
 pfracs <- read_excel("raw_data/Pfrac_mass_focuscorrect.xlsx")
 pigments <- read.csv("raw_data/WL_pigments_allcores.csv")
+diatoms <- #read in diatom data
 
 #check the data
 glimpse(bsi)
@@ -58,6 +61,7 @@ glimpse(dates_dmar)
 glimpse(loi)
 glimpse(pfracs)
 glimpse(pigments)
+glimpse(diatoms)
 
 ## ----------------------------------- ##
 # Match columns and lake names ----
@@ -67,6 +71,7 @@ unique(dates_dmar$lake)
 unique(loi$lake)
 unique(pfracs$lake)
 unique(pigments$lake)
+unique(diatoms$Lake)
 
 #format column names to match
 #lake, depth, analyte before name...
@@ -111,6 +116,20 @@ pigments_v2 <- pigments %>% select(!c(X,sample_depth,extraction_weight_mg,percen
                         lake=="Smoke"~"smoke",
                         lake=="WTwin"~"wtwin"))
 
+diatoms_v2 <- diatoms %>% select(!c(`...1`,Year)) %>% #use dates from loess model
+  dplyr::rename(depth=botepth,
+                lake=Lake) %>%
+  mutate(lake=case_when(lake=="Burnt"~"burnt",
+                        lake=="Dunnigan"~"dunnigan",
+                        lake=="ETwin"~"etwin",
+                        lake=="Elbow"~"elbow",
+                        lake=="Finger"~"finger",
+                        lake=="Flame"~"flame",
+                        lake=="Smoke"~"smoke",
+                        lake=="WTwin"~"wtwin"))
+
+
+
 ## ----------------------------------- ##
 # Merge together ----
 ## ----------------------------------- ##
@@ -118,7 +137,8 @@ master_v1 <- dates_dmar_v2 %>%
   full_join(loi_v2) %>%
   full_join(bsi_v2) %>%
   full_join(pfracs_v2) %>%
-  full_join(pigments_v2)
+  full_join(pigments_v2) %>%
+  full_join(diatoms_v2)
 glimpse(master_v1)
 
-write.csv(master_v1,file="WL_paleo_masterdataset_10Sept2024.csv")
+write.csv(master_v1,file="WL_paleo_masterdataset_22Sept2024.csv")
