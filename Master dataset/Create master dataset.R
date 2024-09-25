@@ -7,7 +7,7 @@ rm(list=ls())
 librarian::shelf(tidyverse, googledrive,readxl)
 
 getwd()
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/Master dataset") #change this to match local GitHub folder
+setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractionst") #change this to match local GitHub folder
 
 ## ----------------------------------- ##
 # Download data ----
@@ -20,7 +20,7 @@ dates_dmar_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders
 loi_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/1WhQLgIDeu5N1SvcdrYztCWfjBdCb-HR_") #contains WL_LOI_allcores.xlsx
 pigment_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/1y-zoTHbMW9eBUMPLkWLC_P6Qvcw-n-yL") #raw pigment data, all cores WL_pigments_allcores.csv
 pfracs_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/11lWhi9zlPjE2PDnLIAPNbDnbVXrGAxQo") #Pfrac_mass_focuscorrect google sheet
-diatoms_url <- 
+diatoms_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/111Cev1JyY5i4EFqkmUcvtsrBZHt_Z_f8") #wilddiatom_rawdat.csv
 
 # Identify needed data in the Drive
 wanted_files <- googledrive::drive_ls(path = bsi_url) %>%
@@ -28,13 +28,14 @@ wanted_files <- googledrive::drive_ls(path = bsi_url) %>%
   dplyr::bind_rows(googledrive::drive_ls(path = loi_url)) %>%
   dplyr::bind_rows(googledrive::drive_ls(path = pigment_url)) %>%
   dplyr::bind_rows(googledrive::drive_ls(path = pfracs_url)) %>%
+  dplyr::bind_rows(googledrive::drive_ls(path = diatoms_url)) %>%
   # Filter to only needed files
   dplyr::filter(name %in% c("WL_BSi_all.xlsx",
                             "sections_interp_year_dmar_30July2024.csv",
                             "WL_LOI_allcores.xlsx",
                             "WL_pigments_allcores.csv",
-                            "Pfrac_mass_focuscorrect" #saved as Google sheet, no file extension needed
-                            #add diatom data here
+                            "Pfrac_mass_focuscorrect", #saved as Google sheet, no file extension needed
+                            "wilddiatom_rawdat.csv"
                             ))
 # Check those files
 wanted_files
@@ -53,7 +54,7 @@ dates_dmar <- read.csv("raw_data/sections_interp_year_dmar_30July2024.csv")
 loi <- read_excel("raw_data/WL_LOI_allcores.xlsx") %>% janitor::clean_names()
 pfracs <- read_excel("raw_data/Pfrac_mass_focuscorrect.xlsx")
 pigments <- read.csv("raw_data/WL_pigments_allcores.csv")
-diatoms <- #read in diatom data
+diatoms <- read.csv("raw_data/wilddiatom_rawdat.csv")
 
 #check the data
 glimpse(bsi)
@@ -116,7 +117,7 @@ pigments_v2 <- pigments %>% select(!c(X,sample_depth,extraction_weight_mg,percen
                         lake=="Smoke"~"smoke",
                         lake=="WTwin"~"wtwin"))
 
-diatoms_v2 <- diatoms %>% select(!c(`...1`,Year)) %>% #use dates from loess model
+diatoms_v2 <- diatoms %>% select(!c(X,Year)) %>% #use dates from loess model
   dplyr::rename(depth=botepth,
                 lake=Lake) %>%
   mutate(lake=case_when(lake=="Burnt"~"burnt",
@@ -127,8 +128,12 @@ diatoms_v2 <- diatoms %>% select(!c(`...1`,Year)) %>% #use dates from loess mode
                         lake=="Flame"~"flame",
                         lake=="Smoke"~"smoke",
                         lake=="WTwin"~"wtwin"))
-
-
+#calculate relative abundance
+diatoms_v3 <- diatoms_v2 %>% mutate(tot_count=rowSums(across(`Ach..microcephala`:`Uln..ulna`), na.rm=T)) %>%
+  mutate_at(vars(-c(lake,depth,tot_count)),funs(./tot_count*100)) %>%
+  mutate(tot_abund=rowSums(across(`Ach..microcephala`:`Uln..ulna`),na.rm=T)) %>%
+  janitor::clean_names()
+glimpse(diatoms_v3)
 
 ## ----------------------------------- ##
 # Merge together ----
@@ -138,7 +143,7 @@ master_v1 <- dates_dmar_v2 %>%
   full_join(bsi_v2) %>%
   full_join(pfracs_v2) %>%
   full_join(pigments_v2) %>%
-  full_join(diatoms_v2)
+  full_join(diatoms_v3)
 glimpse(master_v1)
 
-write.csv(master_v1,file="WL_paleo_masterdataset_22Sept2024.csv")
+write.csv(master_v1,file="WL_paleo_masterdataset_25Sept2024.csv")
