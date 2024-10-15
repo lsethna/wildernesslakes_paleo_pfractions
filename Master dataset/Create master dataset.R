@@ -7,7 +7,7 @@ rm(list=ls())
 librarian::shelf(tidyverse, googledrive,readxl)
 
 getwd()
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractionst") #change this to match local GitHub folder
+setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
 
 ## ----------------------------------- ##
 # Download data ----
@@ -33,7 +33,7 @@ wanted_files <- googledrive::drive_ls(path = bsi_url) %>%
   dplyr::filter(name %in% c("WL_BSi_all.xlsx",
                             "sections_interp_year_dmar_30July2024.csv",
                             "WL_LOI_allcores.xlsx",
-                            "WL_pigments_allcores.csv",
+                            "WL_pigments_allcores_14Oct24.csv",
                             "Pfrac_mass_focuscorrect", #saved as Google sheet, no file extension needed
                             "wilddiatom_rawdat.csv"
                             ))
@@ -53,7 +53,7 @@ bsi <- read_excel("raw_data/WL_BSi_all.xlsx")
 dates_dmar <- read.csv("raw_data/sections_interp_year_dmar_30July2024.csv")
 loi <- read_excel("raw_data/WL_LOI_allcores.xlsx") %>% janitor::clean_names()
 pfracs <- read_excel("raw_data/Pfrac_mass_focuscorrect.xlsx")
-pigments <- read.csv("raw_data/WL_pigments_allcores.csv")
+pigments <- read.csv("raw_data/WL_pigments_allcores_14Oct24.csv")
 diatoms <- read.csv("raw_data/wilddiatom_rawdat.csv")
 
 #check the data
@@ -107,7 +107,8 @@ loi_v2 <- loi %>% select(!c(top)) %>%
 pfracs_v2 <- pfracs %>% select(!c(`...1`,id,notes,DMAR,year)) %>%
   rename(depth=depth_base)
 
-pigments_v2 <- pigments %>% select(!c(X,sample_depth,extraction_weight_mg,percent_organic)) %>%
+pigments_v2 <- pigments %>% select(!c(X,sample_depth)) %>%
+  janitor::clean_names() %>%
   mutate(lake=case_when(lake=="Burnt"~"burnt",
                         lake=="Dunnigan"~"dunnigan",
                         lake=="ETwin"~"etwin",
@@ -146,4 +147,4 @@ master_v1 <- dates_dmar_v2 %>%
   full_join(diatoms_v3)
 glimpse(master_v1)
 
-write.csv(master_v1,file="WL_paleo_masterdataset_25Sept2024.csv")
+write.csv(master_v1,file="WL_paleo_masterdataset_14Oct2024.csv")
