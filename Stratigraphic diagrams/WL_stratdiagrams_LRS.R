@@ -41,18 +41,43 @@ glimpse(master_dat)
 
 #Worne isotope proposal
 worne <- master_dat %>% select(c(lake,year_loess,tp_results_mg_p_g,sio2_wt_percent,chl_a,echine,cantha,fra_crotonensis,ast_formosa))
+#WRC presentation
+wrc <- master_dat %>% select(c(lake,year_loess,percent_organic,
+                               tp_results_mg_p_g,bd_p,
+                               sio2_wt_percent,
+                               chl_a,echine,cantha,
+                               fra_crotonensis,ast_formosa))
+
 
 #plot using rioja?
-librarian::shelf(rioja,vegan)
+librarian::shelf(vegan)
 
-#E. Twin
-etwin <- worne %>%
-  filter(lake=="etwin")
-glimpse(etwin)
-etwin.plot <- strat.plot(etwin[,3:9],yvar=etwin$year_loess,
+#Burnt
+burnt <- wrc %>%
+  filter(lake=="burnt")
+glimpse(burnt)
+burnt.plot <- strat.plot(burnt[1:27,3:11],yvar=burnt$year_loess[1:27],
                          y.tks=seq(1860,2020,20),
                          plot.poly=T,plot.bar=T,col.bar="black",
                          srt.xlabel=45,title="Burnt")
+#wtwin
+flame <- wrc %>%
+  filter(lake=="flame")
+glimpse(flame)
+flame.plot <- strat.plot(flame[1:21,3:11],yvar=flame$year_loess[1:21],
+                         y.tks=seq(1850,2015,15),
+                         plot.poly=T,plot.bar=T,col.bar="black",
+                         srt.xlabel=45,title="Flame")
+
+### ----------------------------------- ##
+# CONISS  ----
+## ----------------------------------- ##
+#distance matrix  
+dist.mat <- vegdist(burnt[1:27,3:9],method="euclidian", binary=FALSE, diag=FALSE, upper=FALSE, na.rm=T)
+#coniss cluster
+chclust.obj <- chclust(dist.mat,method="coniss")
+#find optimal number of clusters
+bstick(chclust.obj)
 
 #clear plots between sites
 dev.off()
