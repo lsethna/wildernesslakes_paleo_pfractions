@@ -25,6 +25,7 @@ sel_pig <- pivot_longer(sel_p,cols=chlide_a:car_z) %>% filter(value>0)
 #filter master data based on selected diatoms and pigments
 master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
                                    10:12, #loi; perc inorg,org,calc
+                                   17:24, #P and P fractions
                                    13,sel_diat$name, #BSi conc, select diatoms
                                    sel_pig$name)
 glimpse(master_v2)
@@ -34,22 +35,28 @@ glimpse(master_v2)
 ## ------------------------------- ##
 master_v3_interp <- master_v2 %>%
   group_by(lake) %>%
-  mutate_at(vars(concentration_si_o2:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
+  mutate_at(vars(ex_p:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
   ungroup()
 colnames(master_v3_interp)
+
+write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_15Oct24.csv")
 
 ## -------------- ##
 ## ---- PCoA ---- ##
 ## -------------- ##
 
+##NEED TO REDO COLUMN CALLS FOR DIATOMS AND PIGMENTS
+#diatoms=16:31
+#pigments=32:51
+
 #standardize diatoms
-diat.stand.hell <- decostand(master_v3_interp[,8:23], method="hellinger")
+diat.stand.hell <- decostand(master_v3_interp[,16:31], method="hellinger")
 #diatom distance matrix
 diat.dist <- dist(diat.stand.hell, method="euclidean")
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
-pig.stand.hell <- decostand(master_v3_interp[,24:43], method="hellinger")
+pig.stand.hell <- decostand(master_v3_interp[,32:51], method="hellinger")
 #pigment distance matrix
 pig.dist <- dist(pig.stand.hell, method="euclidean")
 pig.dist <- pig.dist/max(pig.dist)
@@ -67,25 +74,28 @@ site.comb <- data.frame(scores(comb.mds))
 #add sample IDs
 site.comb$lake <- master_v3_interp$lake
 site.comb$year <- master_v3_interp$year_loess
+site.comb$mix.regime <- master_v3_interp$mix.regime
 
 #combined vectors for all vars
 comb.vec <- envfit(comb.mds, env=master_v3_interp[,-3],na.rm=T) #include all paleo vars except depth
 comb.vec <- data.frame(cbind(comb.vec$vectors$arrows, comb.vec$vectors$r, comb.vec$vectors$pvals))
 comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.001 & comb.vec$V3 >= 0.5)
 #just diatom vectors
-diat.vec <- envfit(comb.mds,env=master_v3_interp[,8:23],na.rm=T)
+diat.vec <- envfit(comb.mds,env=master_v3_interp[,16:31],na.rm=T)
 diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
 diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.001 & diat.vec$V3 >= 0.5)
 #just pigment vectors
-pig.vec <- envfit(comb.mds,env=master_v3_interp[,24:43],na.rm=T)
+pig.vec <- envfit(comb.mds,env=master_v3_interp[,32:51],na.rm=T)
 pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
 pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.001 & pig.vec$V3 >= 0.5)
 
-p1 <- 
-  ggplot(aes(Dim1, Dim2, colour=lake), data=site.comb) +  
-  geom_text(aes(label=round(site.comb$year,0)), vjust=2, size=3, fontface="bold", show_guide=F) + 
-  geom_path(aes(Dim1, Dim2,lty=lake), arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
-  theme_bw(base_size=14);p1
+ggplot(aes(Dim1, Dim2, lty=lake,colour=mix.regime), data=site.comb) +  
+  #geom_text(aes(label=round(site.comb$year,0)), vjust=2, size=3, fontface="bold", show_guide=F) + 
+  geom_path(aes(Dim1, Dim2),size=1, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
+            lineend="round") + 
+  scale_color_manual(values=c("lightgreen","royalblue","pink"))+
+  theme_bw(base_size=14)
 
 ggplot(aes(Dim1, Dim2),data=site.comb) +  
   geom_text(aes(label=round(site.comb$year,0)), vjust=2, size=3, fontface="bold", show_guide=F) + 
