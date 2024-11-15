@@ -52,6 +52,8 @@ wrc <- master_dat %>% select(c(lake,year_loess,percent_organic, #selecting col
                                chl_a,echine,cantha,
                                fra_crotonensis,ast_formosa))
 
+
+master_dat <- read.csv("raw_data/WL_paleo_masterdataset_25Sept2024.csv") 
 #Paleo paper diagrams
 master_dat <- master_dat %>% mutate(recalcitrant_o_p_flux=recalcitrant_o_p*dmar_loess,
                                labile_o_p_flux=labile_o_p*dmar_loess,
@@ -60,7 +62,7 @@ master_dat <- master_dat %>% mutate(recalcitrant_o_p_flux=recalcitrant_o_p*dmar_
 
 paleo <- master_dat %>% select(c(lake,year_loess,percent_organic,
                                  recalcitrant_o_p_flux,labile_o_p_flux,tp_results_flux,
-                                 ast_formosa, aul_ambigua, fra_crotonensis, lin_intermedia, tab_flocculosa, aul_ambigua, sta_venter,
+                                  aul_ambigua, sta_venter, fra_crotonensis, lin_intermedia, tab_flocculosa, ast_formosa,
                                  sio2_wt_percent,
                                  echine,cantha,myxo,chl_a))
 
@@ -77,9 +79,9 @@ color_palette <- c(
   "#1F4E79",  # Dark Blue
   
   
-  "#FFE4B5",  # Very Light Orange (Lightened)
-  "#FFD700",  # Light Orange (Golden)
-  "#FFA500",  # Medium Orange (Original)
+  "#FFE4B5",  # Very Light Orange (Lightened) tycho-planktonic taxa
+  "#FFD700",  # Light Orange (Golden) tycho-planktonic taxa
+  "#FFA500",  # Medium Orange (Original) tycho-planktonic taxa
   "#FF7F32",  # Darker Orange (Brighter)
   "#FF6600",  # Dark Orange (Pure Orange)
   "#FF4500",  # Darkest Orange (Vibrant Red-Orange)
@@ -120,18 +122,72 @@ burnt.paleo <- strat.plot(burnt_paleo[1:27,3:17],yvar=burnt_paleo$year_loess[1:2
 
 
 
+#Elbow Lake plot
+elbow_paleo <- paleo %>%
+  filter(lake=="elbow")
+elbow.paleo <- strat.plot(elbow_paleo[1:27,3:17],yvar=elbow_paleo$year_loess[1:27], #elbow[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          col.poly = color_palette,
+                          srt.xlabel=45,title="Elbow")
+
+
+#finger Lake plot
+finger_paleo <- paleo %>%
+  filter(lake=="finger")
+finger.paleo <- strat.plot(finger_paleo[1:27,3:17],yvar=finger_paleo$year_loess[1:27], #finger[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          col.poly = color_palette,
+                          srt.xlabel=45,title="Finger")
+
+#Flame lake plot
+flame_paleo <- paleo %>%
+  filter(lake=="flame")
+flame.paleo <- strat.plot(flame_paleo[1:27,3:17],yvar=flame_paleo$year_loess[1:27], #flame[rows,col]
+                           y.tks=seq(1860,2020,20),
+                           plot.poly=T,plot.bar=T,col.bar="black",
+                           col.poly = color_palette,
+                           srt.xlabel=45,title="Flame")
 
 
 
+#wtwin lake plot
+wtwin_paleo <- paleo %>%
+  filter(lake=="wtwin")
+wtwin.paleo <- strat.plot(wtwin_paleo[1:27,3:17],yvar=wtwin_paleo$year_loess[1:27], #wtwin[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          col.poly = color_palette,
+                          srt.xlabel=45,title="West Twin")
 
 
+#smoke lake plot
+smoke_paleo <- paleo %>%
+  filter(lake=="smoke")
+smoke.paleo <- strat.plot(smoke_paleo[1:27,3:17],yvar=smoke_paleo$year_loess[1:27], #smoke[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          col.poly = color_palette,
+                          srt.xlabel=45,title="Smoke")
 
+#etwin lake plot
+etwin_paleo <- paleo %>%
+  filter(lake=="etwin")
+etwin.paleo <- strat.plot(etwin_paleo[1:27,3:17],yvar=etwin_paleo$year_loess[1:27], #etwin[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          col.poly = color_palette,
+                          srt.xlabel=45,title="East Twin")
 
-
-
-
-
-
+#dunnigan lake plot
+dunnigan_paleo <- paleo %>%
+  filter(lake=="dunnigan")
+dunnigan.paleo <- strat.plot(dunnigan_paleo[1:27,3:17],yvar=dunnigan_paleo$year_loess[1:27], #dunnigan[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          col.poly = color_palette,
+                          srt.xlabel=45,title="Dunnigan")
 
 
 

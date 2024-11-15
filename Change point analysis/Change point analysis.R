@@ -7,7 +7,13 @@ rm(list=ls())
 librarian::shelf(tidyverse, googledrive,readxl,rioja)
 
 getwd()
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
+#change this to match local GitHub folder
+setwd("C:/Users/16512/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
+
+#read in data from folder
+library(readr)
+WL_paleo<- read_csv("WL_paleo_masterdataset_14Oct2024.csv")
+
 
 ## ----------------------------------- ##
 # Download data ----
@@ -38,10 +44,71 @@ glimpse(master_dat)
 int_master_dat <- read.csv("raw_data/interpolated_master_dat_15Oct24.csv")
 glimpse(int_master_dat)
 
+
+
+wrc <- master_dat %>% select(c(lake,year_loess,percent_organic, #selecting col
+                               tp_results_mg_p_g,bd_p,
+                               sio2_wt_percent,
+                               chl_a,echine,cantha,
+                               fra_crotonensis,ast_formosa))
+
+#check normality of data to determine if you need to transform it:
+
+ggplot(master_dat, aes(sample = percent_organic)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = percent_inorg)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = sio2_wt_percent)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = tp_results_mg_p_g)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = labile_o_p)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = recalcitrant_o_p)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = echine)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = cantha)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+ggplot(master_dat, aes(sample = myxo)) +
+  stat_qq() +
+  stat_qq_line() +
+  facet_wrap(~ lake, scales = "free")
+
+
+#make new data set with col of interest and filter out NA
+
+cpt.meanvar(int_master_dat$percent_organic,penalty="MBIC",pen.value=0,method="AMOC",Q=5,test.stat="Normal",
+            class=TRUE,param.estimates=TRUE,shape=1,minseglen=2)
 ## write a loop ##
 
 lakes <- unique(master_dat$lake)
 colnames(master_dat) #what variables do we have?
+#list the variables you want to analyze
 variable <- c("percent_organic","tp_results_mg_p_g","bd_p","sio2_wt_percent") #list the variables you want to analyze
 lakes
  
@@ -61,9 +128,11 @@ for (i in 1:length(lakes)) {
 
 
 
+#Change point analysis
+library(changepoint)
+library(changepoint.np)
 
-
-
+data(HC1)
 
 
 
