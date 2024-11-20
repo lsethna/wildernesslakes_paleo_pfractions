@@ -35,7 +35,7 @@ wanted_files <- googledrive::drive_ls(path = bsi_url) %>%
   dplyr::filter(name %in% c("WL_BSi_all.xlsx",
                             "sections_interp_year_dmar_30July2024.csv",
                             "WL_LOI_allcores.xlsx",
-                            "WL_pigments_allcores_14Oct24.csv",
+                            "WL_allpigments_20Nov24.csv",
                             "Pfrac_mass_focuscorrect", #saved as Google sheet, no file extension needed
                             "wilddiatom_rawdat.csv",
                             "WL_isotopes_rawdat.xlsx"
@@ -56,7 +56,7 @@ bsi <- read_excel("raw_data/WL_BSi_all.xlsx")
 dates_dmar <- read.csv("raw_data/sections_interp_year_dmar_30July2024.csv")
 loi <- read_excel("raw_data/WL_LOI_allcores.xlsx") %>% janitor::clean_names()
 pfracs <- read_excel("raw_data/Pfrac_mass_focuscorrect.xlsx")
-pigments <- read.csv("raw_data/WL_pigments_allcores_14Oct24.csv")
+pigments <- read.csv("raw_data/WL_allpigments_20Nov24.csv")
 diatoms <- read.csv("raw_data/wilddiatom_rawdat.csv")
 isotopes <- read_excel("raw_data/WL_isotopes_rawdat.xlsx")
 
@@ -113,8 +113,7 @@ loi_v2 <- loi %>% select(!c(top)) %>%
 pfracs_v2 <- pfracs %>% select(!c(`...1`,id,notes,DMAR,year)) %>%
   rename(depth=depth_base)
 
-pigments_v2 <- pigments %>% select(!c(X,sample_depth,Lake)) %>%
-  janitor::clean_names() %>%
+pigments_v2 <- pigments %>% select(!c(X)) %>%
   mutate(lake=case_when(lake=="BURNT"~"burnt",
                         lake=="Dunnigan"~"dunnigan",
                         lake=="East Twin"~"etwin",
@@ -172,4 +171,11 @@ master_v1 <- dates_dmar_v2 %>%
   full_join(isotopes_v2)
 glimpse(master_v1)
 
-write.csv(master_v1,file="WL_paleo_masterdataset_14Oct2024.csv")
+#plot to check funky stuff
+#just date v. sample to check for doubles?
+ggplot(master_v1,aes(x=year_loess,y=depth))+
+  geom_point()+
+  facet_wrap(~lake)
+
+getwd()
+write.csv(master_v1,file="Master dataset/WL_paleo_masterdataset_20Nov2024.csv")
