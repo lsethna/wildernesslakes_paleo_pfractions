@@ -5,12 +5,12 @@ rm(list=ls())
 setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/Paleo PCoA")
 
 #read in master data
-master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_14Oct2024.csv")
+master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv")
 
 ## ------------------------------------------------------------ ##
 ## ---- filter variables: pigments>0, diatoms>2% abundance ---- ##
 ## ------------------------------------------------------------ ##
-vars <- data.frame(col.num=c(1:272),
+vars <- data.frame(col.num=c(1:277),
                    var=colnames(master_dat))
 #pigments 25:56
 #diatoms 57:270
@@ -27,7 +27,8 @@ master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
                                    10:12, #loi; perc inorg,org,calc
                                    17:24, #P and P fractions
                                    13,sel_diat$name, #BSi conc, select diatoms
-                                   sel_pig$name)
+                                   sel_pig$name, #select pigments
+                                   275:277) #TOC, TN, TOC:TN
 glimpse(master_v2)
 
 ## ------------------------------- ##
@@ -35,11 +36,12 @@ glimpse(master_v2)
 ## ------------------------------- ##
 master_v3_interp <- master_v2 %>%
   group_by(lake) %>%
-  mutate_at(vars(ex_p:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
+  mutate_at(vars(ex_p:TOC_TN_ratio),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
   ungroup()
-colnames(master_v3_interp)
+glimpse(master_v3_interp)
 
-write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_15Oct24.csv")
+setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
+write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_10Dec24.csv")
 
 ## -------------- ##
 ## ---- PCoA ---- ##

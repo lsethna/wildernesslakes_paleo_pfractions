@@ -18,8 +18,8 @@ master_url <- googledrive::as_id("https://drive.google.com/drive/u/0/folders/13r
 # Identify needed data in the Drive
 wanted_files <- googledrive::drive_ls(path = master_url) %>%
   # Filter to only needed files
-  dplyr::filter(name %in% c("WL_paleo_masterdataset_25Sept2024.csv",
-                            "interpolated_master_dat_15Oct24.csv"))
+  dplyr::filter(name %in% c("WL_paleo_masterdataset_20Nov2024.csv",
+                            "interpolated_master_dat_10Dec24.csv"))
 # Check those files
 wanted_files
 # Create a folder to download data into
@@ -32,11 +32,11 @@ purrr::walk2(.x = wanted_files$name, .y = wanted_files$id,
 ## ----------------------------------- ##
 # Read in data ----
 ## ----------------------------------- ##
-master_dat <- read.csv("raw_data/WL_paleo_masterdataset_25Sept2024.csv") #%>% select(!X)
+master_dat <- read.csv("raw_data/WL_paleo_masterdataset_20Nov2024.csv") #%>% select(!X)
 #check
 glimpse(master_dat)
 #interpolated master dat
-int_master_dat <- read.csv("raw_data/interpolated_master_dat_15Oct24.csv")
+int_master_dat <- read.csv("raw_data/interpolated_master_dat_10Dec24.csv")
 glimpse(int_master_dat)
 
 ## ----------------------------------- ##
