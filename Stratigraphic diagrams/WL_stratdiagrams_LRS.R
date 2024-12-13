@@ -167,10 +167,10 @@ finger <- int_master_dat %>%
            concentration_si_o2,
            chl_a,ast_formosa,allo,fuco))
 glimpse(finger)
-finger <- strat.plot(finger[,2:9],yvar=finger$year_loess,
-           y.tks=seq(1860,2020,20),
-           plot.poly=T,plot.bar=T,col.bar="black",
-           srt.xlabel=30,title="Finger")
+finger_plot <- strat.plot(finger[,2:9],yvar=finger$year_loess,
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          srt.xlabel=30,title="Finger")
 #finger CONISS
 #distance matrix  
 dist.mat <- vegdist(finger[,2:9],method="euclidian", binary=FALSE, diag=FALSE, upper=FALSE, na.rm=T)
@@ -179,7 +179,7 @@ chclust.obj <- chclust(dist.mat,method="coniss")
 #find optimal number of clusters
 bstick(chclust.obj)
 #finger=3
-addClustZone(finger,chclust.obj,nZone=3,lwd=1.5,lty="dashed",col="gray25")
+addClustZone(finger_plot,chclust.obj,nZone=3,lwd=1.5,lty="dashed",col="gray25")
 
 #wtwin stratigraph
 wtwin <- int_master_dat %>%
