@@ -7,7 +7,7 @@ rm(list=ls())
 librarian::shelf(tidyverse, googledrive,readxl,rioja)
 
 getwd()
-setwd("C:/Users/16512/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
+setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
 
 ## ----------------------------------- ##
 # Download data ----
@@ -53,88 +53,43 @@ wrc <- master_dat %>% select(c(lake,year_loess,percent_organic, #selecting col
                                fra_crotonensis,ast_formosa))
 
 #Paleo paper diagrams
+#calculate p flux
 master_dat <- master_dat %>% mutate(recalcitrant_o_p_flux=recalcitrant_o_p*dmar_loess,
                                labile_o_p_flux=labile_o_p*dmar_loess,
                                 tp_results_flux=tp_results_mg_p_g*dmar_loess)
-  
+#calculate pigment degradation
+master_dat <- master_dat %>% mutate(chl_pheo=chl_a/pheo_a)
+#filter to abundant (>2%) diatoms
+sel_d <- master_dat %>% select(ach_microcephala:uln_ulna) %>% 
+  summarize(across(ach_microcephala:uln_ulna,max,na.rm=T)) #get maximum count for each species
+sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>12) #filter to max value 8 (8 counts=2% rel. abund)
+write.csv(sel_diat,file="WL_diatoms_3percabund.csv")
 
 paleo <- master_dat %>% select(c(lake,year_loess,percent_organic,
                                  recalcitrant_o_p_flux,labile_o_p_flux,tp_results_flux,
-                                 ast_formosa, aul_ambigua, fra_crotonensis, lin_intermedia, tab_flocculosa, aul_ambigua, sta_venter,
+                                 sel_diat$name, #all diatoms with >3% abundance
                                  sio2_wt_percent,
-                                 echine,cantha,myxo,chl_a))
-
-
-custom_colors <- c("skyblue", "salmon", "palegreen", "orange", "purple", "pink", "yellow", "cyan", "red", "blue", "brown", "green", "gold")
-
-color_palette <- c(
-  # Dark Gray
-  "#4B4B4B",  # Dark Gray
-  
-  # Blue Shades
-  "#AEC6FF",  # Light Blue
-  "#5A9BD4",  # Medium Blue
-  "#1F4E79",  # Dark Blue
-  
-  
-  "#FFE4B5",  # Very Light Orange (Lightened)
-  "#FFD700",  # Light Orange (Golden)
-  "#FFA500",  # Medium Orange (Original)
-  "#FF7F32",  # Darker Orange (Brighter)
-  "#FF6600",  # Dark Orange (Pure Orange)
-  "#FF4500",  # Darkest Orange (Vibrant Red-Orange)
-  
-  #Light gray
-  "#d3d3d3", #silica
-  
-  # Green Shades
-  "#D3E4B3",  # Very Light Green (new)
-  "#B0E57C",  # Light Green
-  "#66B032",  # Medium Green
-  "#2E6E1D",  # Dark Green
-  
-  # Purple Shades
-  "#D7BDE2",  # Light Purple
-  "#A569BD",  # Medium Purple
-  "#6C3483",  # Dark Purple
-  
-  # Brown Shades
-  "#D2B48C",  # Light Brown (Tan)
-  "#A0522D",  # Medium Brown
-  "#4B2E00"   # Dark Brown
-)
-
-# Display the color palette
-color_palette
-
+                                 echine,aphan,cantha,myxo,diato,chl_a,chl_pheo))
 
 #Burnt Lake plot
 burnt_paleo <- paleo %>%
   filter(lake=="burnt")
-burnt.paleo <- strat.plot(burnt_paleo[1:27,3:17],yvar=burnt_paleo$year_loess[1:27], #burnt[rows,col]
+burnt.paleo <- strat.plot(burnt_paleo[1:27,7:18],yvar=burnt_paleo$year_loess[1:27], #burnt[rows,col]
                           y.tks=seq(1860,2020,20),
                           plot.poly=T,plot.bar=T,col.bar="black",
-                          col.poly = color_palette,
                           srt.xlabel=45,title="Burnt")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+smoke_paleo <- paleo %>%
+  filter(lake=="smoke")
+smoke.paleo <- strat.plot(smoke_paleo[1:27,7:18],yvar=smoke_paleo$year_loess[1:27], #burnt[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          srt.xlabel=45,title="Smoke")
+etwin_paleo <- paleo %>%
+  filter(lake=="etwin")
+etwin.paleo <- strat.plot(etwin_paleo[1:71,7:18],yvar=etwin_paleo$year_loess[1:71], #burnt[rows,col]
+                          y.tks=seq(1860,2020,20),
+                          plot.poly=T,plot.bar=T,col.bar="black",
+                          srt.xlabel=45,title="etwin")
 #plot using rioja?
 librarian::shelf(vegan)
 
@@ -146,7 +101,7 @@ burnt.plot <- strat.plot(burnt[1:32,3:17],yvar=burnt$year_loess[1:32], #burnt[ro
                          y.tks=seq(1860,2020,20),
                          plot.poly=T,plot.bar=T,col.bar="black",
                          srt.xlabel=45,title="Burnt")
-#wtwin
+#flame
 flame <- wrc %>%
   filter(lake=="flame")
 glimpse(flame)
