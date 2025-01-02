@@ -61,9 +61,9 @@ master_dat <- master_dat %>% mutate(recalcitrant_o_p_flux=recalcitrant_o_p*dmar_
 master_dat <- master_dat %>% mutate(chl_pheo=chl_a/pheo_a)
 #filter to abundant (>2%) diatoms
 sel_d <- master_dat %>% select(ach_microcephala:uln_ulna) %>% 
-  summarize(across(ach_microcephala:uln_ulna,max,na.rm=T)) #get maximum count for each species
-sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>12) #filter to max value 8 (8 counts=2% rel. abund)
-write.csv(sel_diat,file="WL_diatoms_3percabund.csv")
+  summarize(across(ach_microcephala:uln_ulna,max,na.rm=T)) #get maximum abundance for each species
+sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>5) #filter to max value 5%
+write.csv(sel_diat,file="WL_diatoms_5percabund.csv")
 
 paleo <- master_dat %>% select(c(lake,year_loess,percent_organic,
                                  recalcitrant_o_p_flux,labile_o_p_flux,tp_results_flux,
