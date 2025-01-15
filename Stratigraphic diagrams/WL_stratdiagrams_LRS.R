@@ -133,6 +133,8 @@ dist.mat <- vegdist(finger[,2:9],method="euclidian", binary=FALSE, diag=FALSE, u
 chclust.obj <- chclust(dist.mat,method="coniss")
 #find optimal number of clusters
 bstick(chclust.obj)
+
+cutree(chclust.obj,k=3)
 #finger=3
 addClustZone(finger_plot,chclust.obj,nZone=3,lwd=1.5,lty="dashed",col="gray25")
 
