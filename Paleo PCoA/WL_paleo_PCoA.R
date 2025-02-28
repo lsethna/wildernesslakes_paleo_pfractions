@@ -6,6 +6,7 @@ setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/Pa
 
 #read in master data
 master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv")
+glimpse(master_dat)
 
 ## ------------------------------------------------------------ ##
 ## ---- filter variables: pigments>0, diatoms>2% abundance ---- ##
@@ -16,8 +17,8 @@ vars <- data.frame(col.num=c(1:277),
 #diatoms 57:270
 sel_d <- master_dat %>% select(colnames(master_dat[,57:270])) %>% 
   summarize(across(ach_microcephala:uln_ulna,max,na.rm=T)) #get maximum count for each species
-sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>8) #filter to max value 8 (8 counts=2% rel. abund)
-#16 total diatoms with >2% rel abund
+sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>5) #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
+##
 sel_p <- master_dat %>% select(colnames(master_dat[,25:56])) %>% 
   summarize(across(chlide_a:car_z,max,na.rm=T))
 sel_pig <- pivot_longer(sel_p,cols=chlide_a:car_z) %>% filter(value>0)
@@ -54,6 +55,7 @@ write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_10Dec24.csv")
 diat.stand.hell <- decostand(master_v3_interp[,16:31], method="hellinger")
 #diatom distance matrix
 diat.dist <- dist(diat.stand.hell, method="euclidean")
+#normalize the diatom vectors to allow for comparison across proxies
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
@@ -67,7 +69,7 @@ comb.dist <- diat.dist+pig.dist
 #and scale
 comb.mds <- cmdscale(d=comb.dist, k=2)
 #add site IDs
-comb.mds$lake <- master_v3_interp$lake
+comb.mds$lake <- master_v3_interp$lake #adding in the lake is coercing model into list
 comb.mds$year <- master_v3_interp$year_loess
 plot(comb.mds)
 #get scores
