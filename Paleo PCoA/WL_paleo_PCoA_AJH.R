@@ -2,10 +2,10 @@ librarian::shelf(tidyverse,grid,vegan,cowplot,zoo)
 
 rm(list=ls())
 
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/Paleo PCoA")
+setwd("~/Library/CloudStorage/GoogleDrive-aheathcote@smm.org/My Drive/SCWRS/LCCMR Wilderness Lakes/WL Paleo MS")
 
 #read in master data
-master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv")
+master_dat <- read.csv("WL_paleo_masterdataset_20Nov2024.csv")
 glimpse(master_dat)
 
 ## ------------------------------------------------------------ ##
@@ -17,16 +17,17 @@ vars <- data.frame(col.num=c(1:277),
 #diatoms 57:270
 sel_d <- master_dat %>% select(colnames(master_dat[,57:270])) %>% 
   summarize(across(ach_microcephala:uln_ulna,max,na.rm=T)) #get maximum count for each species
-sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>2) #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
+sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>2) #filter to 2% relative abundance (might want to only filter to 2% and at least in two samples)
 ##
 sel_p <- master_dat %>% select(colnames(master_dat[,25:56])) %>% 
   summarize(across(chlide_a:car_z,max,na.rm=T))
-sel_pig <- pivot_longer(sel_p,cols=chlide_a:car_z) %>% filter(value>0)
+sel_p <- sel_p[c(4:5, 9,10, 12, 14:22,24,29)] #select biologically meaningful pigments
+sel_pig <- pivot_longer(sel_p,cols=perid:b_car) %>% filter(value>0)
 #20 different detectable pigments
 #filter master data based on selected diatoms and pigments
 master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
                                    10:12, #loi; perc inorg,org,calc
-                                   17:24, #P and P fractions
+                                   #17:24, #P and P fractions
                                    13,sel_diat$name, #BSi conc, select diatoms
                                    sel_pig$name, #select pigments
                                    275:277) #TOC, TN, TOC:TN
@@ -37,29 +38,29 @@ glimpse(master_v2)
 ## ------------------------------- ##
 master_v3_interp <- master_v2 %>%
   group_by(lake) %>%
-  mutate_at(vars(ex_p:TOC_TN_ratio),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
+  mutate_at(vars(percent_organic:TOC_TN_ratio),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
   ungroup()
 glimpse(master_v3_interp)
 
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
-write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_10Dec24.csv")
+#setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
+#write.csv(master_v3_interp,file="interpolated_master_dat_24Feb25.csv")
 
 ## -------------- ##
 ## ---- PCoA ---- ##
 ## -------------- ##
 
-#diatoms=16:31
-#pigments=32:51
+#diatoms=8:52
+#pigments=53:63
 
 #standardize diatoms
-diat.stand.hell <- vegan::decostand(master_v3_interp[,16:31], method="hellinger")
+diat.stand.hell <- decostand(master_v3_interp[,8:52], method="hellinger")
 #diatom distance matrix
 diat.dist <- dist(diat.stand.hell, method="euclidean")
 #normalize the diatom vectors to allow for comparison across proxies
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
-pig.stand.hell <- decostand(master_v3_interp[,32:51], method="hellinger")
+pig.stand.hell <- decostand(master_v3_interp[,53:63], method="hellinger")
 #pigment distance matrix
 pig.dist <- dist(pig.stand.hell, method="euclidean")
 pig.dist <- pig.dist/max(pig.dist)
@@ -67,28 +68,25 @@ pig.dist <- pig.dist/max(pig.dist)
 #combine distance matrices
 comb.dist <- diat.dist+pig.dist
 #and scale
-comb.mds <- data.frame(cmdscale(d=comb.dist, k=2))
-#add site IDs
-comb.mds$lake <- master_v3_interp$lake #adding in the lake is coercing model into list
-comb.mds$year <- master_v3_interp$year_loess
-plot(comb.mds)
+comb.mds <- cmdscale(d=comb.dist, k=2)
+
 #get scores
 site.comb <- data.frame(scores(comb.mds))
 #add sample IDs
 site.comb$lake <- master_v3_interp$lake
 site.comb$year <- master_v3_interp$year_loess
-site.comb$mix.regime <- master_v3_interp$mix.regime
+#site.comb$mix.regime <- master_v3_interp$mix.regime
 
 #combined vectors for all vars
 comb.vec <- envfit(comb.mds, env=master_v3_interp[,-3],na.rm=T) #include all paleo vars except depth
 comb.vec <- data.frame(cbind(comb.vec$vectors$arrows, comb.vec$vectors$r, comb.vec$vectors$pvals))
 comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.001 & comb.vec$V3 >= 0.5)
 #just diatom vectors
-diat.vec <- envfit(comb.mds,env=master_v3_interp[,16:31],na.rm=T)
+diat.vec <- envfit(comb.mds,env=master_v3_interp[,8:52],na.rm=T)
 diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
-diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.001 & diat.vec$V3 >= 0.5)
+diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.001 & diat.vec$V3 >= 0.75)
 #just pigment vectors
-pig.vec <- envfit(comb.mds,env=master_v3_interp[,32:51],na.rm=T)
+pig.vec <- envfit(comb.mds,env=master_v3_interp[,53:63],na.rm=T)
 pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
 pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.001 & pig.vec$V3 >= 0.5)
 
@@ -133,9 +131,9 @@ mixed.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime=="Well m
 di.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime=="Dimictic")
 
 #standardize diatoms
-diat.stand.hell.poly <- decostand(poly.master.dat[,8:23], method="hellinger")
-diat.stand.hell.mixed <- decostand(mixed.master.dat[,8:23], method="hellinger")
-diat.stand.hell.di <- decostand(di.master.dat[,8:23], method="hellinger")
+diat.stand.hell.poly <- decostand(poly.master.dat[,8:52], method="hellinger")
+diat.stand.hell.mixed <- decostand(mixed.master.dat[,8:52], method="hellinger")
+diat.stand.hell.di <- decostand(di.master.dat[,8:52], method="hellinger")
 #diatom distance matrix
 diat.dist.poly <- dist(diat.stand.hell.poly, method="euclidean")
 diat.dist.mixed <- dist(diat.stand.hell.mixed, method="euclidean")
@@ -146,9 +144,9 @@ diat.dist.mixed <- diat.dist.mixed/max(diat.dist.mixed)
 diat.dist.di <- diat.dist.di/max(diat.dist.di)
 
 #standardize pigments
-pig.stand.hell.poly <- decostand(poly.master.dat[,24:43], method="hellinger")
-pig.stand.hell.mixed <- decostand(mixed.master.dat[,24:43], method="hellinger")
-pig.stand.hell.di <- decostand(di.master.dat[,24:43], method="hellinger")
+pig.stand.hell.poly <- decostand(poly.master.dat[,53:63], method="hellinger")
+pig.stand.hell.mixed <- decostand(mixed.master.dat[,53:63], method="hellinger")
+pig.stand.hell.di <- decostand(di.master.dat[,53:63], method="hellinger")
 #pigment distance matrix
 pig.dist.poly <- dist(pig.stand.hell.poly, method="euclidean")
 pig.dist.mixed <- dist(pig.stand.hell.mixed, method="euclidean")
@@ -186,37 +184,37 @@ di.comb.scores$year <- di.master.dat$year_loess
 
 #diatom and pigment vectors for each mixing regime
 #polymictic diatom vectors
-poly.diat.vec <- envfit(poly.comb.mds,env=poly.master.dat[,8:23],na.rm=T)
+poly.diat.vec <- envfit(poly.comb.mds,env=poly.master.dat[,8:52],na.rm=T)
 poly.diat.vec <- data.frame(cbind(poly.diat.vec$vectors$arrows, 
                                   poly.diat.vec$vectors$r, 
                                   poly.diat.vec$vectors$pvals))
 poly.diat.vec.sig <- subset(poly.diat.vec, poly.diat.vec$V4 <= 0.001 & poly.diat.vec$V3 >= 0.5)
 #well mixed diatom vectors
-mixed.diat.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,8:23],na.rm=T)
+mixed.diat.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,8:52],na.rm=T)
 mixed.diat.vec <- data.frame(cbind(mixed.diat.vec$vectors$arrows, 
                                   mixed.diat.vec$vectors$r, 
                                   mixed.diat.vec$vectors$pvals))
 mixed.diat.vec.sig <- subset(mixed.diat.vec, mixed.diat.vec$V4 <= 0.001 & mixed.diat.vec$V3 >= 0.5)
 #dimictic diatom vectors
-di.diat.vec <- envfit(di.comb.mds,env=di.master.dat[,8:23],na.rm=T)
+di.diat.vec <- envfit(di.comb.mds,env=di.master.dat[,8:52],na.rm=T)
 di.diat.vec <- data.frame(cbind(di.diat.vec$vectors$arrows, 
                                   di.diat.vec$vectors$r, 
                                   di.diat.vec$vectors$pvals))
 di.diat.vec.sig <- subset(di.diat.vec, di.diat.vec$V4 <= 0.001 & di.diat.vec$V3 >= 0.5)
 #polymictic pigment vectors
-poly.pig.vec <- envfit(poly.comb.mds,env=poly.master.dat[,24:43],na.rm=T)
+poly.pig.vec <- envfit(poly.comb.mds,env=poly.master.dat[,53:63],na.rm=T)
 poly.pig.vec <- data.frame(cbind(poly.pig.vec$vectors$arrows, 
                                   poly.pig.vec$vectors$r, 
                                   poly.pig.vec$vectors$pvals))
 poly.pig.vec.sig <- subset(poly.pig.vec, poly.pig.vec$V4 <= 0.001 & poly.pig.vec$V3 >= 0.5)
 #well mixed pigment vectors
-mixed.pig.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,24:43],na.rm=T)
+mixed.pig.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,53:46],na.rm=T)
 mixed.pig.vec <- data.frame(cbind(mixed.pig.vec$vectors$arrows, 
                                    mixed.pig.vec$vectors$r, 
                                    mixed.pig.vec$vectors$pvals))
 mixed.pig.vec.sig <- subset(mixed.pig.vec, mixed.pig.vec$V4 <= 0.001 & mixed.pig.vec$V3 >= 0.5)
 #dimictic pigment vectors
-di.pig.vec <- envfit(di.comb.mds,env=di.master.dat[,24:43],na.rm=T)
+di.pig.vec <- envfit(di.comb.mds,env=di.master.dat[,53:63],na.rm=T)
 di.pig.vec <- data.frame(cbind(di.pig.vec$vectors$arrows, 
                                 di.pig.vec$vectors$r, 
                                 di.pig.vec$vectors$pvals))
@@ -268,18 +266,18 @@ ggplot(aes(Dim1, Dim2, colour=lake), data=di.comb.scores) +
 ## ----------------------------------------------------------- ##
 
 #create new dfs for one lake in each mixing regime
-burnt.master.dat <- subset(poly.master.dat,poly.master.dat$lake=="burnt")
-finger.master.dat <- subset(mixed.master.dat,mixed.master.dat$lake=="finger")
-wtwin.master.dat <- subset(di.master.dat,di.master.dat$lake=="wtwin")
+burnt.master.dat <- na.omit(subset(poly.master.dat,poly.master.dat$lake=="burnt"))
+finger.master.dat <- na.omit(subset(mixed.master.dat,mixed.master.dat$lake=="finger"))
+wtwin.master.dat <- na.omit(subset(di.master.dat,di.master.dat$lake=="wtwin"))
 
 #check
 glimpse(wtwin.master.dat)
 colnames(finger.master.dat)
 
 #standardize geochemistry
-geochem.stand.hell.burnt <- decostand(burnt.master.dat[,c(4,8,13)],method="hellinger")
-geochem.stand.hell.finger <- decostand(finger.master.dat[,c(4,8,13)],method="hellinger")
-geochem.stand.hell.wtwin <- decostand(wtwin.master.dat[,c(4,8,13)],method="hellinger")
+geochem.stand.hell.burnt <- decostand(burnt.master.dat[,c(4:7,64:66)],method="hellinger")
+geochem.stand.hell.finger <- decostand(finger.master.dat[,c(4:7,64:66)],method="hellinger")
+geochem.stand.hell.wtwin <- decostand(wtwin.master.dat[,c(4:7,64:66)],method="hellinger")
 #geochemistry distance matrix
 geochem.dist.burnt <- dist(geochem.stand.hell.burnt, method="euclidean")
 geochem.dist.finger <- dist(geochem.stand.hell.finger, method="euclidean")
@@ -290,9 +288,9 @@ geochem.dist.finger <- geochem.dist.finger/max(geochem.dist.finger)
 geochem.dist.wtwin <- geochem.dist.wtwin/max(geochem.dist.wtwin)
 
 #standardize diatoms
-diat.stand.hell.burnt <- decostand(burnt.master.dat[,16:31], method="hellinger")
-diat.stand.hell.finger <- decostand(finger.master.dat[,16:31], method="hellinger")
-diat.stand.hell.wtwin <- decostand(wtwin.master.dat[,16:31], method="hellinger")
+diat.stand.hell.burnt <- decostand(burnt.master.dat[,8:52], method="hellinger")
+diat.stand.hell.finger <- decostand(finger.master.dat[,8:52], method="hellinger")
+diat.stand.hell.wtwin <- decostand(wtwin.master.dat[,8:52], method="hellinger")
 #diatom distance matrix
 diat.dist.burnt <- dist(diat.stand.hell.burnt, method="euclidean")
 diat.dist.finger <- dist(diat.stand.hell.finger, method="euclidean")
@@ -303,9 +301,9 @@ diat.dist.finger <- diat.dist.finger/max(diat.dist.finger)
 diat.dist.wtwin <- diat.dist.wtwin/max(diat.dist.wtwin)
 
 #standardize pigments
-pig.stand.hell.burnt <- decostand(burnt.master.dat[,32:51], method="hellinger")
-pig.stand.hell.finger <- decostand(finger.master.dat[,32:51], method="hellinger")
-pig.stand.hell.wtwin <- decostand(wtwin.master.dat[,32:51], method="hellinger")
+pig.stand.hell.burnt <- decostand(burnt.master.dat[,53:63], method="hellinger")
+pig.stand.hell.finger <- decostand(finger.master.dat[,53:63], method="hellinger")
+pig.stand.hell.wtwin <- decostand(wtwin.master.dat[,53:63], method="hellinger")
 #pigment distance matrix
 pig.dist.burnt <- dist(pig.stand.hell.burnt, method="euclidean")
 pig.dist.finger <- dist(pig.stand.hell.finger, method="euclidean")
@@ -343,56 +341,56 @@ wtwin.comb.scores$year <- wtwin.master.dat$year_loess
 
 ## geochem, diatom, and pigment vectors for each mixing regime ##
 #burnt geochem vectors
-burnt.geo.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,c(4,8,13)],na.rm=T)
+burnt.geo.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,c(4:7,64:66)],na.rm=T)
 burnt.geo.vec <- data.frame(cbind(burnt.geo.vec$vectors$arrows, 
                                   burnt.geo.vec$vectors$r, 
                                   burnt.geo.vec$vectors$pvals))
 burnt.geo.vec.sig <- subset(burnt.geo.vec, burnt.geo.vec$V4 <= 0.001 & burnt.geo.vec$V3 >= 0.5)
 #finger geochem vectors
-finger.geo.vec <- envfit(finger.comb.mds,env=finger.master.dat[,c(4,8,13)],na.rm=T)
+finger.geo.vec <- envfit(finger.comb.mds,env=finger.master.dat[,c(4:7,64:66)],na.rm=T)
 finger.geo.vec <- data.frame(cbind(finger.geo.vec$vectors$arrows, 
                                    finger.geo.vec$vectors$r, 
                                    finger.geo.vec$vectors$pvals))
 finger.geo.vec.sig <- subset(finger.geo.vec, finger.geo.vec$V4 <= 0.001 & finger.geo.vec$V3 >= 0.5)
 #wtwin geochem vectors
-wtwin.geo.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,c(4,8,13)],na.rm=T)
+wtwin.geo.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,c(4:7,64:66)],na.rm=T)
 wtwin.geo.vec <- data.frame(cbind(wtwin.geo.vec$vectors$arrows, 
                                   wtwin.geo.vec$vectors$r, 
                                   wtwin.geo.vec$vectors$pvals))
 wtwin.geo.vec.sig <- subset(wtwin.geo.vec, wtwin.geo.vec$V4 <= 0.001 & wtwin.geo.vec$V3 >= 0.5)
 
 #Burnt diatom vectors
-burnt.diat.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,16:31],na.rm=T)
+burnt.diat.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,8:52],na.rm=T)
 burnt.diat.vec <- data.frame(cbind(burnt.diat.vec$vectors$arrows, 
                                    burnt.diat.vec$vectors$r, 
                                    burnt.diat.vec$vectors$pvals))
 burnt.diat.vec.sig <- subset(burnt.diat.vec, burnt.diat.vec$V4 <= 0.001 & burnt.diat.vec$V3 >= 0.5)
 #finger mixed diatom vectors
-finger.diat.vec <- envfit(finger.comb.mds,env=finger.master.dat[,16:31],na.rm=T)
+finger.diat.vec <- envfit(finger.comb.mds,env=finger.master.dat[,8:52],na.rm=T)
 finger.diat.vec <- data.frame(cbind(finger.diat.vec$vectors$arrows, 
                                    finger.diat.vec$vectors$r, 
                                    finger.diat.vec$vectors$pvals))
 finger.diat.vec.sig <- subset(finger.diat.vec, finger.diat.vec$V4 <= 0.001 & finger.diat.vec$V3 >= 0.5)
 #wtwin diatom vectors
-wtwin.diat.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,16:31],na.rm=T)
+wtwin.diat.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,8:52],na.rm=T)
 wtwin.diat.vec <- data.frame(cbind(wtwin.diat.vec$vectors$arrows, 
                                 wtwin.diat.vec$vectors$r, 
                                 wtwin.diat.vec$vectors$pvals))
 wtwin.diat.vec.sig <- subset(wtwin.diat.vec, wtwin.diat.vec$V4 <= 0.001 & wtwin.diat.vec$V3 >= 0.5)
 #burnt pigment vectors
-burnt.pig.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,32:51],na.rm=T)
+burnt.pig.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,53:63],na.rm=T)
 burnt.pig.vec <- data.frame(cbind(burnt.pig.vec$vectors$arrows, 
                                  burnt.pig.vec$vectors$r, 
                                  burnt.pig.vec$vectors$pvals))
 burnt.pig.vec.sig <- subset(burnt.pig.vec, burnt.pig.vec$V4 <= 0.001 & burnt.pig.vec$V3 >= 0.5)
 #finger pigment vectors
-finger.pig.vec <- envfit(finger.comb.mds,env=finger.master.dat[,32:51],na.rm=T)
+finger.pig.vec <- envfit(finger.comb.mds,env=finger.master.dat[,53:63],na.rm=T)
 finger.pig.vec <- data.frame(cbind(finger.pig.vec$vectors$arrows, 
                                   finger.pig.vec$vectors$r, 
                                   finger.pig.vec$vectors$pvals))
 finger.pig.vec.sig <- subset(finger.pig.vec, finger.pig.vec$V4 <= 0.001 & finger.pig.vec$V3 >= 0.5)
 #wtwin pigment vectors
-wtwin.pig.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,32:51],na.rm=T)
+wtwin.pig.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,53:63],na.rm=T)
 wtwin.pig.vec <- data.frame(cbind(wtwin.pig.vec$vectors$arrows, 
                                wtwin.pig.vec$vectors$r, 
                                wtwin.pig.vec$vectors$pvals))
@@ -461,3 +459,20 @@ ggplot(aes(Dim1, Dim2), data=wtwin.comb.scores) +
   theme_bw(base_size=14)
 
 cowplot::plot_grid(burnt.pcoa,finger.pcoa,wtwin.pcoa,ncol=3)
+
+burnt.pcoa
+
+
+#####CONISSS#########
+###POLY CONISS
+
+polysig.m <- data.frame(cbind(poly.master.dat$year_loess,poly.master.dat[,rownames(burnt.diat.vec.sig)], poly.master.dat[,rownames(burnt.pig.vec.sig)]), poly.master.dat[,row.names(burnt.geo.vec.sig)])
+poly.burnt.m <- na.omit(subset(polysig.m, poly.master.dat$lake == "burnt"))
+cols.burnt <- c(rep("orange", times=nrow(burnt.diat.vec.sig)), rep("darkgreen", times=nrow(burnt.pig.vec.sig)),rep("hotpink", times=nrow(burnt.geo.vec.sig)))
+
+con.comb.burnt <- chclust(burnt.comb.dist, method="coniss")
+plot(con.comb.burnt, labels=round(poly.burnt.m[,1],0))
+bstick(con.comb.burnt)
+
+s1 <- strat.plot(poly.burnt.m[,-1], yvar=poly.burnt.m[,1], clust=con.comb.burnt, title="Burnt", cex.xlab=1, cex.yaxis=1, cex.title=2, col.bar=cols.burnt, plot.bar=T, lwd.bar=3, srt.xlabel=45, cex.axis=0.5, y.tks=seq(1840,2020, by=20), yTop=0.7)
+addClustZone(s1, con.comb.burnt, nZone=5, col=2, lty=2, lwd=2)
