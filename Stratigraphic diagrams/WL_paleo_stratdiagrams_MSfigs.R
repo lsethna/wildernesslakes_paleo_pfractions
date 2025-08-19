@@ -50,7 +50,8 @@ paleo_prod %>%
   geom_bar(stat="identity",width=0.5)+
   facet_geochem_gridh(vars(name),grouping=vars(lake))+
   theme_classic()+
-  theme(strip.text=element_text(angle=45),
+  theme(strip.text.x=element_text(angle=45,size=10),
+        strip.text.y=element_text(size=10),
         strip.background=element_blank(),
         axis.text.x=element_text(angle=90),
         axis.title=element_blank())
