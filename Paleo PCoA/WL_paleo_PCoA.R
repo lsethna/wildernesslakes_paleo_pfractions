@@ -5,31 +5,35 @@ rm(list=ls())
 setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/Paleo PCoA")
 
 #read in master data
-master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv")
+master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv") %>%
+  select(!X)
 glimpse(master_dat)
 
 ## ------------------------------------------------------------ ##
 ## ---- filter variables: pigments>0, diatoms>2% abundance ---- ##
 ## ------------------------------------------------------------ ##
-vars <- data.frame(col.num=c(1:277),
-                   var=colnames(master_dat))
+vars <- data.frame(
+  column_n=1:length(master_dat),
+  vars=colnames(master_dat))
+vars
 #pigments 25:56
 #diatoms 57:270
-sel_d <- master_dat %>% select(colnames(master_dat[,57:270])) %>% 
-  summarize(across(ach_microcephala:uln_ulna,max,na.rm=T)) #get maximum count for each species
-sel_diat <- pivot_longer(sel_d,cols=ach_microcephala:uln_ulna) %>% filter(value>2) #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
+sel_diat <- master_dat %>% select(colnames(master_dat[,c(56:269)])) %>% 
+  pivot_longer(cols=ach_microcephala:uln_ulna) %>% filter(value>2) %>% #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
+  select(name) %>% distinct()
+  
 ##
-sel_p <- master_dat %>% select(colnames(master_dat[,25:56])) %>% 
+sel_p <- master_dat %>% select(colnames(master_dat[,24:55])) %>% 
   summarize(across(chlide_a:car_z,max,na.rm=T))
 sel_pig <- pivot_longer(sel_p,cols=chlide_a:car_z) %>% filter(value>0)
 #20 different detectable pigments
 #filter master data based on selected diatoms and pigments
 master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
-                                   10:12, #loi; perc inorg,org,calc
-                                   17:24, #P and P fractions
-                                   13,sel_diat$name, #BSi conc, select diatoms
+                                   9:11, #loi; perc inorg,org,calc
+                                   16:23, #P and P fractions
+                                   14,sel_diat$name, #BSi conc, select diatoms
                                    sel_pig$name, #select pigments
-                                   275:277) #TOC, TN, TOC:TN
+                                   274:276) #TOC, TN, TOC:TN
 glimpse(master_v2)
 
 ## ------------------------------- ##
@@ -42,24 +46,25 @@ master_v3_interp <- master_v2 %>%
 glimpse(master_v3_interp)
 
 setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
-write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_10Dec24.csv")
+write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_4Sep25.csv")
 
 ## -------------- ##
 ## ---- PCoA ---- ##
 ## -------------- ##
 
-#diatoms=16:31
-#pigments=32:51
+colnames(master_v3_interp)
+#diatoms=16:60
+#pigments=61:80
 
 #standardize diatoms
-diat.stand.hell <- vegan::decostand(master_v3_interp[,16:31], method="hellinger")
+diat.stand.hell <- vegan::decostand(master_v3_interp[,16:60], method="hellinger")
 #diatom distance matrix
 diat.dist <- dist(diat.stand.hell, method="euclidean")
 #normalize the diatom vectors to allow for comparison across proxies
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
-pig.stand.hell <- decostand(master_v3_interp[,32:51], method="hellinger")
+pig.stand.hell <- decostand(master_v3_interp[,61:80], method="hellinger")
 #pigment distance matrix
 pig.dist <- dist(pig.stand.hell, method="euclidean")
 pig.dist <- pig.dist/max(pig.dist)
@@ -68,49 +73,52 @@ pig.dist <- pig.dist/max(pig.dist)
 comb.dist <- diat.dist+pig.dist
 #and scale
 comb.mds <- data.frame(cmdscale(d=comb.dist, k=2))
-#add site IDs
-comb.mds$lake <- master_v3_interp$lake #adding in the lake is coercing model into list
-comb.mds$year <- master_v3_interp$year_loess
+
 plot(comb.mds)
+
 #get scores
 site.comb <- data.frame(scores(comb.mds))
+
 #add sample IDs
 site.comb$lake <- master_v3_interp$lake
 site.comb$year <- master_v3_interp$year_loess
-site.comb$mix.regime <- master_v3_interp$mix.regime
 
 #combined vectors for all vars
 comb.vec <- envfit(comb.mds, env=master_v3_interp[,-3],na.rm=T) #include all paleo vars except depth
 comb.vec <- data.frame(cbind(comb.vec$vectors$arrows, comb.vec$vectors$r, comb.vec$vectors$pvals))
-comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.001 & comb.vec$V3 >= 0.5)
+comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.05 & comb.vec$V3 >= 0.6) #only saves vectors that are significant (p<0.05) and explain >60% of variability
 #just diatom vectors
-diat.vec <- envfit(comb.mds,env=master_v3_interp[,16:31],na.rm=T)
+diat.vec <- envfit(comb.mds,env=master_v3_interp[,16:60],na.rm=T)
 diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
-diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.001 & diat.vec$V3 >= 0.5)
+diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.9)
 #just pigment vectors
-pig.vec <- envfit(comb.mds,env=master_v3_interp[,32:51],na.rm=T)
+pig.vec <- envfit(comb.mds,env=master_v3_interp[,61:80],na.rm=T)
 pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
-pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.001 & pig.vec$V3 >= 0.5)
+pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.7)
 
-ggplot(aes(Dim1, Dim2,colour=lake), data=site.comb) +  
-  #geom_text(aes(label=round(site.comb$year,0)), vjust=2, size=3, fontface="bold", show_guide=F) + 
-  geom_path(aes(Dim1, Dim2),size=1, 
-            arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
-            lineend="round") + 
-  theme_bw(base_size=14)
+# Scale arrows by r2 to show correlation strength
+pig.vec.sig$X1 <- pig.vec.sig$X1 * pig.vec.sig$V3
+pig.vec.sig$X2 <- pig.vec.sig$X2 * pig.vec.sig$V3
+diat.vec.sig$X1 <- diat.vec.sig$X1 * diat.vec.sig$V3
+diat.vec.sig$X2 <- diat.vec.sig$X2 * diat.vec.sig$V3
 
 #plot PCoA paths for all lakes
-ggplot(aes(Dim1, Dim2),data=site.comb) +  
-  geom_text(aes(label=round(site.comb$year,0)), vjust=2, size=3, fontface="bold", show_guide=F) + 
-  geom_path(aes(Dim1, Dim2,lty=lake), arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
-  geom_segment(aes(x=rep(0, nrow(pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=pig.vec.sig) + 
-  geom_text(aes(x=Dim1, y=Dim2), data=pig.vec.sig, label=rownames(pig.vec.sig), colour="darkgreen", size=4) +  
-  geom_segment(aes(x=rep(0, nrow(diat.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(diat.vec.sig)),yend=Dim2), 
-               colour="orange", data=diat.vec.sig) + 
-  geom_text(aes(x=Dim1, y=Dim2), data=diat.vec.sig, label=rownames(diat.vec.sig), colour="orange", size=4) +
+ggplot(aes(X1, X2),data=site.comb) +  
+  #lake trajectories 
+  geom_path(aes(color=lake), arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+  #pigment vectors
+  geom_segment(data=pig.vec.sig,
+               aes(x=0,y=0,xend=X1,yend=X2), 
+               color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=pig.vec.sig,
+            aes(x=X1, y=X2),label=rownames(pig.vec.sig), 
+            color="darkgreen", size=4,vjust=-0.5) +  
+  #diatom vectors
+  geom_segment(data=diat.vec.sig,
+               aes(x=0,y=0,xend=X1,yend=X2), 
+               color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=diat.vec.sig,
+            aes(x=X1, y=X2),label=rownames(diat.vec.sig), color="orange", size=4,vjust=-0.5) +
   theme_bw(base_size=14)
 
 ## ------------------------------------- ##
