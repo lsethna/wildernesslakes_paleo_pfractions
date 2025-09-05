@@ -284,7 +284,7 @@ for (i in 1:length(mixing_regime)) {
   pcoa.plots[[i]] <- p
 }
 
-cowplot::plot_grid(pcoa.plots[[1]],pcoa.plots[[2]],pcoa.plots[[3]],ncol=3)
+cowplot::plot_grid(pcoa.plots[[2]],pcoa.plots[[1]],pcoa.plots[[3]],ncol=3)
 
 ## ----------------------------------------------------------- ##
 ## ---- PCoA for one lake representing each mixing regime ---- ##
