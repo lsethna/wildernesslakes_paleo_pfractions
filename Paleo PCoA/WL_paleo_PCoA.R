@@ -185,7 +185,7 @@ master_v3_interp <- master_v3_interp %>%
 mixing_regime = unique(master_v3_interp$mix.regime)
 pcoa.scores_mixing.regime <- list() #list to save scores output
 pcoa.variable.vectors <- list() #list to save variable vectors
-pcoa.plots <- list()
+pcoa.plots <- list() #list to save PCoA plots
 
 for (i in 1:length(mixing_regime)) {
   #create df for each mixing regime
@@ -283,6 +283,8 @@ for (i in 1:length(mixing_regime)) {
 
   pcoa.plots[[i]] <- p
 }
+
+cowplot::plot_grid(pcoa.plots[[1]],pcoa.plots[[2]],pcoa.plots[[3]],ncol=3)
 
 ## ----------------------------------------------------------- ##
 ## ---- PCoA for one lake representing each mixing regime ---- ##
