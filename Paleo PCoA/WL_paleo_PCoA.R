@@ -19,21 +19,25 @@ vars
 #pigments 25:56
 #diatoms 57:270
 sel_diat <- master_dat %>% select(colnames(master_dat[,c(56:269)])) %>% 
-  pivot_longer(cols=ach_microcephala:uln_ulna) %>% filter(value>2) %>% #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
+  pivot_longer(cols=ach_microcephala:uln_ulna) %>% filter(value>5) %>% #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
   select(name) %>% distinct()
   
 ##
 sel_p <- master_dat %>% select(colnames(master_dat[,24:55])) %>% 
   summarize(across(chlide_a:car_z,max,na.rm=T))
-sel_pig <- pivot_longer(sel_p,cols=chlide_a:car_z) %>% filter(value>0)
-#20 different detectable pigments
+sel_pig <- sel_p %>% 
+  select(!c("sudan","chl_c1","chl_c2","fuco","diadino","chl_b","chl_a","chl_ap")) %>% #remove unstable or non-interpretable pigments
+  pivot_longer(cols=chlide_a:car_z) %>% filter(value>0) #remove any non-detect pigments
+
 #filter master data based on selected diatoms and pigments
 master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
                                    9:11, #loi; perc inorg,org,calc
-                                   16:23, #P and P fractions
-                                   14,sel_diat$name, #BSi conc, select diatoms
+                                   #16:23, #P and P fractions
+                                   14,sel_diat$name, #BSi flux, select diatoms
                                    sel_pig$name, #select pigments
-                                   274:276) #TOC, TN, TOC:TN
+                                   #274:276 #TOC, TN, TOC:TN
+
+)  
 glimpse(master_v2)
 
 ## ------------------------------- ##
@@ -41,9 +45,13 @@ glimpse(master_v2)
 ## ------------------------------- ##
 master_v3_interp <- master_v2 %>%
   group_by(lake) %>%
-  mutate_at(vars(ex_p:TOC_TN_ratio),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
-  ungroup()
-glimpse(master_v3_interp)
+  mutate_at(vars(percent_organic:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
+  ungroup() %>%
+  drop_na() #remove any NA values - beyond dated intervals
+
+#quick check to make sure all dates and dates are included
+ggplot(master_v3_interp,aes(x=year_loess,y=depth))+
+  geom_line()+facet_wrap(~lake)
 
 setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
 write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_4Sep25.csv")
@@ -53,24 +61,31 @@ write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_4Sep25.csv")
 ## -------------- ##
 
 colnames(master_v3_interp)
-#diatoms=16:60
-#pigments=61:80
+#diatoms=8:33
+#pigments=34:45
+#geochem=4:7
 
 #standardize diatoms
-diat.stand.hell <- vegan::decostand(master_v3_interp[,16:60], method="hellinger")
+diat.stand.hell <- vegan::decostand(master_v3_interp[,8:33], method="hellinger")
 #diatom distance matrix
 diat.dist <- dist(diat.stand.hell, method="euclidean")
 #normalize the diatom vectors to allow for comparison across proxies
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
-pig.stand.hell <- decostand(master_v3_interp[,61:80], method="hellinger")
+pig.stand.hell <- decostand(master_v3_interp[,34:45], method="hellinger")
 #pigment distance matrix
 pig.dist <- dist(pig.stand.hell, method="euclidean")
 pig.dist <- pig.dist/max(pig.dist)
 
+#standardize geochem
+# geochem.stand.hell <- decostand(master_v3_interp[,c(4:7)], method="hellinger")
+# #geochemment distance matrix
+# geochem.dist <- dist(geochem.stand.hell, method="euclidean")
+# geochem.dist <- geochem.dist/max(geochem.dist)
+
 #combine distance matrices
-comb.dist <- diat.dist+pig.dist
+comb.dist <- diat.dist+pig.dist#+geochem.dist
 #and scale
 comb.mds <- data.frame(cmdscale(d=comb.dist, k=2))
 
@@ -86,40 +101,70 @@ site.comb$year <- master_v3_interp$year_loess
 #combined vectors for all vars
 comb.vec <- envfit(comb.mds, env=master_v3_interp[,-3],na.rm=T) #include all paleo vars except depth
 comb.vec <- data.frame(cbind(comb.vec$vectors$arrows, comb.vec$vectors$r, comb.vec$vectors$pvals))
-comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.05 & comb.vec$V3 >= 0.6) #only saves vectors that are significant (p<0.05) and explain >60% of variability
+comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.05 & comb.vec$V3 >= 0.6) #only saves vectors that are significant (p<0.05) and are >60% correlated with ordination
 #just diatom vectors
-diat.vec <- envfit(comb.mds,env=master_v3_interp[,16:60],na.rm=T)
+diat.vec <- envfit(comb.mds,env=master_v3_interp[,8:33],na.rm=T)
 diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
-diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.9)
+diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.6)
 #just pigment vectors
-pig.vec <- envfit(comb.mds,env=master_v3_interp[,61:80],na.rm=T)
+pig.vec <- envfit(comb.mds,env=master_v3_interp[,34:45],na.rm=T)
 pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
-pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.7)
+pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.6)
+#just geochem vectors
+# geochem.vec <- envfit(comb.mds,env=master_v3_interp[,c(4:7)],na.rm=T)
+# geochem.vec <- data.frame(cbind(geochem.vec$vectors$arrows, geochem.vec$vectors$r, geochem.vec$vectors$pvals))
+# geochem.vec.sig <- subset(geochem.vec, geochem.vec$V4 <= 0.05 & geochem.vec$V3 >= 0.6)
 
 # Scale arrows by r2 to show correlation strength
-pig.vec.sig$X1 <- pig.vec.sig$X1 * pig.vec.sig$V3
-pig.vec.sig$X2 <- pig.vec.sig$X2 * pig.vec.sig$V3
-diat.vec.sig$X1 <- diat.vec.sig$X1 * diat.vec.sig$V3
-diat.vec.sig$X2 <- diat.vec.sig$X2 * diat.vec.sig$V3
+pig.vec.sig.scaled <- pig.vec.sig %>%
+  mutate(X1 = (X1*V3)/2,
+         X2 = (X2*V3)/2)
+diat.vec.sig.scaled <- diat.vec.sig %>%
+  mutate(X1 = (X1*V3)/2,
+         X2 = (X2*V3)/2)
+# geochem.vec.sig.scaled <- geochem.vec.sig %>%
+#   mutate(X1 = (X1*V3)/2,
+#          X2 = (X2*V3)/2)
 
 #plot PCoA paths for all lakes
 ggplot(aes(X1, X2),data=site.comb) +  
   #lake trajectories 
-  geom_path(aes(color=lake), arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+  geom_path(aes(color=lake), size=0.75, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
+            lineend="round") + 
   #pigment vectors
-  geom_segment(data=pig.vec.sig,
+  geom_segment(data=pig.vec.sig.scaled,
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
-  geom_text(data=pig.vec.sig,
-            aes(x=X1, y=X2),label=rownames(pig.vec.sig), 
-            color="darkgreen", size=4,vjust=-0.5) +  
+  ggrepel::geom_label_repel(data=pig.vec.sig.scaled,
+            aes(x=X1*1.25, y=X2*1.25),label=rownames(pig.vec.sig.scaled), 
+            color="darkgreen",label.size=NA,fill=NA) +  
   #diatom vectors
-  geom_segment(data=diat.vec.sig,
+  geom_segment(data=diat.vec.sig.scaled,
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
-  geom_text(data=diat.vec.sig,
-            aes(x=X1, y=X2),label=rownames(diat.vec.sig), color="orange", size=4,vjust=-0.5) +
-  theme_bw(base_size=14)
+  ggrepel::geom_label_repel(data=diat.vec.sig.scaled,
+            aes(x=X1*1.25, y=X2*1.25),label=rownames(diat.vec.sig.scaled), 
+            color="orange", label.size=NA,fill=NA) +
+  #geochem vectors
+  # geom_segment(data=geochem.vec.sig.scaled,
+  #              aes(x=0,y=0,xend=X1,yend=X2), 
+  #              color="hotpink",arrow=arrow(length=unit(0.15, "inches"))) + 
+  # ggrepel::geom_label_repel(data=geochem.vec.sig.scaled,
+  #           aes(x=X1*1.25, y=X2*1.25),label=rownames(geochem.vec.sig.scaled), 
+  #           color="hotpink", label.size=NA,fill=NA) +
+  #general aesthetics
+  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+  scale_color_manual(values=c("#C1D9B7", #burnt
+                              "#89CFF0", #dunnigan
+                              "#007CAA", #elbow
+                              "#665191", #etwin
+                              "#d45087", #finger
+                              "#7A871E", #flame
+                              "#104210", #smoke
+                              "#E97451" #wtwin
+  )) +
+  theme_classic(base_size=14) 
 
 ## ------------------------------------- ##
 ## ---- PCoA for each mixing regime ---- ##
@@ -135,15 +180,119 @@ master_v3_interp <- master_v3_interp %>%
                                 lake=="finger"~"Well mixed",
                                 lake=="wtwin"~"Dimictic",
                                 lake=="flame"~"Dimictic"))
+
+#set up variables to run PcoA for each mixing regime in a loop
+mixing_regime = unique(master_v3_interp$mix.regime)
+pcoa.scores_mixing.regime <- list() #list to save scores output
+pcoa.variable.vectors <- list() #list to save variable vectors
+pcoa.plots <- list()
+
+for (i in 1:length(mixing_regime)) {
+  #create df for each mixing regime
+  mix.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime==mixing_regime[i])
+  
+  #standardize diatoms and pigments... 
+  diat.stand.hell.mix <- decostand(mix.master.dat[,8:33], method="hellinger")
+  pig.stand.hell.mix <- decostand(mix.master.dat[,34:45], method="hellinger")
+  #...to create distance matrices
+  diat.dist.mix <- dist(diat.stand.hell.mix, method="euclidean")
+  pig.dist.mix <- dist(pig.stand.hell.mix, method="euclidean")
+  
+  #combine distance matrices...
+  comb.dist.mix <- diat.dist.mix+pig.dist.mix
+  #...and scale
+  comb.mds.mix <- cmdscale(d=comb.dist.mix, k=2)
+  
+  #get scores
+  comb.scores.mix <- data.frame(scores(comb.mds.mix))
+  #add sample IDs
+  comb.scores.mix$lake <- mix.master.dat$lake
+  comb.scores.mix$year <- mix.master.dat$year_loess
+  comb.scores.mix$mix_regime <- mixing_regime[i]
+  
+  #save to list
+  pcoa.scores_mixing.regime[[i]] <- comb.scores.mix
+  
+  #calculate vectors for diatoms and pigments
+  #diatom vectors
+  diat.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,8:33],na.rm=T)
+  diat.vec.mix <- data.frame(cbind(diat.vec.mix$vectors$arrows, 
+                                   diat.vec.mix$vectors$r, 
+                                   diat.vec.mix$vectors$pvals),
+                             var_type="diatoms")
+  #pigments
+  pig.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,34:45],na.rm=T)
+  pig.vec.mix <- data.frame(cbind(pig.vec.mix$vectors$arrows, 
+                                  pig.vec.mix$vectors$r, 
+                                  pig.vec.mix$vectors$pvals),
+                                  var_type="pigment")
+  #save these to list
+  vec.mix <- rbind(diat.vec.mix,pig.vec.mix) %>% mutate(mix_regime=mixing_regime[1])
+  pcoa.variable.vectors[[i]] <- vec.mix
+  
+  #keep only significant vectors for plotting
+  diat.vec.mix.sig <- subset(diat.vec.mix, diat.vec.mix$V4 <= 0.05 & diat.vec.mix$V3 >= 0.6)
+  pig.vec.mix.sig <- subset(pig.vec.mix, pig.vec.mix$V4 <= 0.05 & pig.vec.mix$V3 >= 0.6)
+  
+  # Scale arrows by r2 to show correlation strength
+  diat.vec.mix.sig.scaled <- diat.vec.mix.sig %>%
+    mutate(Dim1 = (Dim1*V3)/2,
+           Dim2 = (Dim2*V3)/2)
+  pig.vec.mix.sig.scaled <- pig.vec.mix.sig %>%
+    mutate(Dim1 = (Dim1*V3)/2,
+           Dim2 = (Dim2*V3)/2)
+  
+  #create PCoA biplot
+  #colors
+  comb.scores.mix <- comb.scores.mix %>% mutate(color = case_when(lake=="burnt" ~ "#C1D9B7",
+                                                                  lake=="dunnigan" ~ "#89CFF0",
+                                                                  lake=="elbow" ~ "#007CAA",
+                                                                  lake=="etwin" ~ "#665191",
+                                                                  lake=="finger" ~"#d45087",
+                                                                  lake=="flame" ~"#7A871E",
+                                                                  lake=="smoke" ~ "#104210",
+                                                                  lake=="wtwin" ~"#E97451") )
+
+  p <- 
+  ggplot(aes(Dim1, Dim2),data=comb.scores.mix) +  
+    #lake trajectories 
+    geom_path(aes(color=lake), size=0.75, 
+              arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+    #pigment vectors
+    geom_segment(data=pig.vec.mix.sig.scaled,
+                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+                 color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+    geom_text(data=pig.vec.mix.sig.scaled,
+              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(pig.vec.mix.sig.scaled), 
+              color="darkgreen", size=4,vjust=-0.5,
+              position=position_jitter(width=0.1,height=0.1)) +  
+    #diatom vectors
+    geom_segment(data=diat.vec.mix.sig.scaled,
+                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+                 color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+    geom_text(data=diat.vec.mix.sig.scaled,
+              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(diat.vec.mix.sig.scaled), 
+              color="orange", size=4,vjust=-0.5,
+              position=position_jitter(width=0.1,height=0.1)) +
+    #general aesthetics
+    labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+    ggtitle(mixing_regime[i]) +
+    scale_color_manual(values=unique(comb.scores.mix$color)) +
+    theme_bw(base_size=14) +
+    theme(legend.position="bottom")
+
+  pcoa.plots[[i]] <- p
+}
+
 #create new dfs for each mixing regime
 poly.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime=="Polymictic")
 mixed.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime=="Well mixed")
 di.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime=="Dimictic")
 
 #standardize diatoms
-diat.stand.hell.poly <- decostand(poly.master.dat[,8:23], method="hellinger")
-diat.stand.hell.mixed <- decostand(mixed.master.dat[,8:23], method="hellinger")
-diat.stand.hell.di <- decostand(di.master.dat[,8:23], method="hellinger")
+diat.stand.hell.poly <- decostand(poly.master.dat[,16:60], method="hellinger")
+diat.stand.hell.mixed <- decostand(mixed.master.dat[,16:60], method="hellinger")
+diat.stand.hell.di <- decostand(di.master.dat[,16:60], method="hellinger")
 #diatom distance matrix
 diat.dist.poly <- dist(diat.stand.hell.poly, method="euclidean")
 diat.dist.mixed <- dist(diat.stand.hell.mixed, method="euclidean")
@@ -154,9 +303,9 @@ diat.dist.mixed <- diat.dist.mixed/max(diat.dist.mixed)
 diat.dist.di <- diat.dist.di/max(diat.dist.di)
 
 #standardize pigments
-pig.stand.hell.poly <- decostand(poly.master.dat[,24:43], method="hellinger")
-pig.stand.hell.mixed <- decostand(mixed.master.dat[,24:43], method="hellinger")
-pig.stand.hell.di <- decostand(di.master.dat[,24:43], method="hellinger")
+pig.stand.hell.poly <- decostand(poly.master.dat[,61:80], method="hellinger")
+pig.stand.hell.mixed <- decostand(mixed.master.dat[,61:80], method="hellinger")
+pig.stand.hell.di <- decostand(di.master.dat[,61:80], method="hellinger")
 #pigment distance matrix
 pig.dist.poly <- dist(pig.stand.hell.poly, method="euclidean")
 pig.dist.mixed <- dist(pig.stand.hell.mixed, method="euclidean")
@@ -192,84 +341,187 @@ mixed.comb.scores$year <- mixed.master.dat$year_loess
 di.comb.scores$lake <- di.master.dat$lake
 di.comb.scores$year <- di.master.dat$year_loess
 
-#diatom and pigment vectors for each mixing regime
+## --- diatom vectors for each mixing regime
 #polymictic diatom vectors
-poly.diat.vec <- envfit(poly.comb.mds,env=poly.master.dat[,8:23],na.rm=T)
+poly.diat.vec <- envfit(poly.comb.mds,env=poly.master.dat[,16:60],na.rm=T)
 poly.diat.vec <- data.frame(cbind(poly.diat.vec$vectors$arrows, 
                                   poly.diat.vec$vectors$r, 
                                   poly.diat.vec$vectors$pvals))
-poly.diat.vec.sig <- subset(poly.diat.vec, poly.diat.vec$V4 <= 0.001 & poly.diat.vec$V3 >= 0.5)
+poly.diat.vec.sig <- subset(poly.diat.vec, poly.diat.vec$V4 <= 0.05 & poly.diat.vec$V3 >= 0.6)
 #well mixed diatom vectors
-mixed.diat.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,8:23],na.rm=T)
+mixed.diat.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,16:60],na.rm=T)
 mixed.diat.vec <- data.frame(cbind(mixed.diat.vec$vectors$arrows, 
                                   mixed.diat.vec$vectors$r, 
                                   mixed.diat.vec$vectors$pvals))
-mixed.diat.vec.sig <- subset(mixed.diat.vec, mixed.diat.vec$V4 <= 0.001 & mixed.diat.vec$V3 >= 0.5)
+mixed.diat.vec.sig <- subset(mixed.diat.vec, mixed.diat.vec$V4 <= 0.05 & mixed.diat.vec$V3 >= 0.95)
 #dimictic diatom vectors
-di.diat.vec <- envfit(di.comb.mds,env=di.master.dat[,8:23],na.rm=T)
+di.diat.vec <- envfit(di.comb.mds,env=di.master.dat[,16:60],na.rm=T)
 di.diat.vec <- data.frame(cbind(di.diat.vec$vectors$arrows, 
                                   di.diat.vec$vectors$r, 
                                   di.diat.vec$vectors$pvals))
-di.diat.vec.sig <- subset(di.diat.vec, di.diat.vec$V4 <= 0.001 & di.diat.vec$V3 >= 0.5)
+di.diat.vec.sig <- subset(di.diat.vec, di.diat.vec$V4 <= 0.05 & di.diat.vec$V3 >= 0.9)
+
+## --- pigment vectors for each mixing regime
 #polymictic pigment vectors
-poly.pig.vec <- envfit(poly.comb.mds,env=poly.master.dat[,24:43],na.rm=T)
+poly.pig.vec <- envfit(poly.comb.mds,env=poly.master.dat[,61:80],na.rm=T)
 poly.pig.vec <- data.frame(cbind(poly.pig.vec$vectors$arrows, 
                                   poly.pig.vec$vectors$r, 
                                   poly.pig.vec$vectors$pvals))
-poly.pig.vec.sig <- subset(poly.pig.vec, poly.pig.vec$V4 <= 0.001 & poly.pig.vec$V3 >= 0.5)
+poly.pig.vec.sig <- subset(poly.pig.vec, poly.pig.vec$V4 <= 0.05 & poly.pig.vec$V3 >= 0.6)
 #well mixed pigment vectors
-mixed.pig.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,24:43],na.rm=T)
+mixed.pig.vec <- envfit(mixed.comb.mds,env=mixed.master.dat[,61:80],na.rm=T)
 mixed.pig.vec <- data.frame(cbind(mixed.pig.vec$vectors$arrows, 
                                    mixed.pig.vec$vectors$r, 
                                    mixed.pig.vec$vectors$pvals))
-mixed.pig.vec.sig <- subset(mixed.pig.vec, mixed.pig.vec$V4 <= 0.001 & mixed.pig.vec$V3 >= 0.5)
+mixed.pig.vec.sig <- subset(mixed.pig.vec, mixed.pig.vec$V4 <= 0.05 & mixed.pig.vec$V3 >= 0.8)
 #dimictic pigment vectors
-di.pig.vec <- envfit(di.comb.mds,env=di.master.dat[,24:43],na.rm=T)
+di.pig.vec <- envfit(di.comb.mds,env=di.master.dat[,61:80],na.rm=T)
 di.pig.vec <- data.frame(cbind(di.pig.vec$vectors$arrows, 
                                 di.pig.vec$vectors$r, 
                                 di.pig.vec$vectors$pvals))
-di.pig.vec.sig <- subset(di.pig.vec, di.pig.vec$V4 <= 0.001 & di.pig.vec$V3 >= 0.5)
+di.pig.vec.sig <- subset(di.pig.vec, di.pig.vec$V4 <= 0.05 & di.pig.vec$V3 >= 0.8)
 
-#create PCoA plots
-#poly.pcoa <- 
-ggplot(aes(Dim1, Dim2, colour=lake), data=poly.comb.scores) +  
-  #geom_text(aes(label=round(poly.comb.scores$year,0)),size=3, fontface="bold",position=position_jitter(width=0.1,height=0.1)) + 
-  geom_path(aes(Dim1, Dim2), arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), lineend="round") + 
-  geom_segment(aes(x=rep(0, nrow(poly.diat.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(poly.diat.vec.sig)),yend=Dim2),
-               colour="orange", data=poly.diat.vec.sig) +
-  geom_text(aes(x=Dim1, y=Dim2), data=poly.diat.vec.sig, label=rownames(poly.diat.vec.sig), colour="orange", size=4) +
-  geom_segment(aes(x=rep(0, nrow(poly.pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(poly.pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=poly.pig.vec.sig) + 
-  geom_text(aes(x=Dim1, y=Dim2), data=poly.pig.vec.sig, label=rownames(poly.pig.vec.sig), colour="darkgreen", size=4) + 
-  theme_bw(base_size=14)
-#mixed.pcoa <- 
-ggplot(aes(Dim1, Dim2, colour=lake), data=mixed.comb.scores) +  
-  #geom_text(aes(label=round(mixed.comb.scores$year,0)),size=3, fontface="bold",position=position_jitter(width=0.1,height=0.1)) + 
-  geom_path(aes(Dim1, Dim2), arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), lineend="round") + 
-  geom_segment(aes(x=rep(0, nrow(mixed.diat.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(mixed.diat.vec.sig)),yend=Dim2),
-               colour="orange", data=mixed.diat.vec.sig) +
-  geom_text(aes(x=Dim1, y=Dim2), data=mixed.diat.vec.sig, label=rownames(mixed.diat.vec.sig), colour="orange", size=4) +
-  geom_segment(aes(x=rep(0, nrow(mixed.pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(mixed.pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=mixed.pig.vec.sig) + 
-  geom_text(aes(x=Dim1, y=Dim2), data=mixed.pig.vec.sig, label=rownames(mixed.pig.vec.sig), colour="darkgreen", size=4) + 
-  theme_bw(base_size=14)
-#di.pcoa <- 
-ggplot(aes(Dim1, Dim2, colour=lake), data=di.comb.scores) +  
-  #geom_text(aes(label=round(di.comb.scores$year,0)),size=3, fontface="bold",position=position_jitter(width=0.1,height=0.1)) + 
-  geom_path(aes(Dim1, Dim2), arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), lineend="round") + 
-  geom_segment(aes(x=rep(0, nrow(di.diat.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(di.diat.vec.sig)),yend=Dim2),
-               colour="orange", data=di.diat.vec.sig) +
-  geom_text(aes(x=Dim1, y=Dim2), data=di.diat.vec.sig, label=rownames(di.diat.vec.sig), colour="orange", size=4) +
-  geom_segment(aes(x=rep(0, nrow(di.pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(di.pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=di.pig.vec.sig) + 
-  geom_text(aes(x=Dim1, y=Dim2), data=di.pig.vec.sig, label=rownames(di.pig.vec.sig), colour="darkgreen", size=4) + 
-  theme_bw(base_size=14)
+### --- create PCoA plots for each mixing regime
+## polymictic
+# Scale arrows by r2 to show correlation strength
+poly.pig.vec.sig.scaled <- poly.pig.vec.sig %>%
+  mutate(Dim1 = (Dim1*V3)/2,
+         Dim2 = (Dim2*V3)/2)
+poly.diat.vec.sig.scaled <- poly.diat.vec.sig %>%
+  mutate(Dim1 = (Dim1*V3)/2,
+         Dim2 = (Dim2*V3)/2)
+
+#plot PCoA paths for polymictic lakes
+poly_pcoa <- 
+ggplot(aes(Dim1, Dim2),data=poly.comb.scores) +  
+  #lake trajectories 
+  geom_path(aes(color=lake), size=0.75, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+  #pigment vectors
+  geom_segment(data=poly.pig.vec.sig.scaled,
+               aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+               color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=poly.pig.vec.sig.scaled,
+            aes(x=Dim1, y=Dim2),label=rownames(poly.pig.vec.sig), 
+            color="darkgreen", size=4,vjust=-0.5,
+            position=position_jitter(width=0.1,height=0.1)) +  
+  #diatom vectors
+  geom_segment(data=poly.diat.vec.sig.scaled,
+               aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+               color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=poly.diat.vec.sig.scaled,
+            aes(x=Dim1, y=Dim2),label=rownames(poly.diat.vec.sig), 
+            color="orange", size=4,vjust=-0.5,
+            position=position_jitter(width=0.1,height=0.1)) +
+  #general aesthetics
+  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+  ggtitle("Polymictic") +
+  scale_color_manual(values=c("#C1D9B7", #burnt
+                              #"#89CFF0", #dunnigan
+                              "#007CAA", #elbow
+                              "#665191", #etwin
+                              #"#d45087", #finger
+                              #"#7A871E", #flame
+                              "#104210" #smoke
+                              #"#E97451" #wtwin
+                              )) +
+  theme_bw(base_size=14) +
+  theme(legend.position="bottom")
+
+## well mixed
+# Scale arrows by r2 to show correlation strength
+mixed.pig.vec.sig.scaled <- mixed.pig.vec.sig %>%
+  mutate(Dim1 = (Dim1*V3)/2,
+         Dim2 = (Dim2*V3)/2)
+mixed.diat.vec.sig.scaled <- mixed.diat.vec.sig %>%
+  mutate(Dim1 = (Dim1*V3)/2,
+         Dim2 = (Dim2*V3)/2)
+
+#plot PCoA paths for well mixed lakes
+mixed_pcoa <- 
+ggplot(aes(Dim1, Dim2),data=mixed.comb.scores) +  
+  #lake trajectories 
+  geom_path(aes(color=lake), size=0.75, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+  #pigment vectors
+  geom_segment(data=mixed.pig.vec.sig.scaled,
+               aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+               color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=mixed.pig.vec.sig.scaled,
+            aes(x=Dim1, y=Dim2),label=rownames(mixed.pig.vec.sig), 
+            color="darkgreen", size=4,vjust=-0.5,
+            position=position_jitter(width=0.1,height=0.1)) +  
+  #diatom vectors
+  geom_segment(data=mixed.diat.vec.sig.scaled,
+               aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+               color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=mixed.diat.vec.sig.scaled,
+            aes(x=Dim1, y=Dim2),label=rownames(mixed.diat.vec.sig), 
+            color="orange", size=4,vjust=-0.5,
+            position=position_jitter(width=0.1,height=0.1)) +
+  #general aesthetics
+  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+  ggtitle("Well mixed") +
+  scale_color_manual(values=c(#"#C1D9B7", #burnt
+                              "#89CFF0", #dunnigan
+                              #"#007CAA", #elbow
+                              #"#665191", #etwin
+                              "#d45087" #finger
+                              #"#7A871E", #flame
+                              #"#104210" #smoke
+                              #"#E97451" #wtwin
+  )) +
+  theme_bw(base_size=14) +
+  theme(legend.position="bottom")
+
+## dimictic
+# Scale arrows by r2 to show correlation strength
+di.pig.vec.sig.scaled <- di.pig.vec.sig %>%
+  mutate(Dim1 = (Dim1*V3)/2,
+         Dim2 = (Dim2*V3)/2)
+di.diat.vec.sig.scaled <- di.diat.vec.sig %>%
+  mutate(Dim1 = (Dim1*V3)/2,
+         Dim2 = (Dim2*V3)/2)
+
+#plot PCoA paths for dimictic lakes
+di_pcoa <- 
+ggplot(aes(Dim1, Dim2),data=di.comb.scores) +  
+  #lake trajectories 
+  geom_path(aes(color=lake), size=0.75, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+  #pigment vectors
+  geom_segment(data=di.pig.vec.sig.scaled,
+               aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+               color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=di.pig.vec.sig.scaled,
+            aes(x=Dim1, y=Dim2),label=rownames(di.pig.vec.sig), 
+            color="darkgreen", size=4,vjust=-0.5,
+            position=position_jitter(width=0.1,height=0.1)) +  
+  #diatom vectors
+  geom_segment(data=di.diat.vec.sig.scaled,
+               aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+               color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+  geom_text(data=di.diat.vec.sig.scaled,
+            aes(x=Dim1, y=Dim2),label=rownames(di.diat.vec.sig), 
+            color="orange", size=4,vjust=-0.5,
+            position=position_jitter(width=0.1,height=0.1)) +
+  #general aesthetics
+  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+  ggtitle("Dimictic") +
+  scale_color_manual(values=c(#"#C1D9B7", #burnt
+    #"#89CFF0", #dunnigan
+    #"#007CAA", #elbow
+    #"#665191", #etwin
+    #"#d45087" #finger
+    "#7A871E", #flame
+    #"#104210" #smoke
+    "#E97451" #wtwin
+  )) +
+  theme_bw(base_size=14) +
+  theme(legend.position="bottom")
+
+
+cowplot::plot_grid(mixed_pcoa,poly_pcoa,di_pcoa,ncol=3)
 
 ## ----------------------------------------------------------- ##
 ## ---- PCoA for one lake representing each mixing regime ---- ##
