@@ -66,25 +66,31 @@ colnames(master_v3_interp)
 #geochem=4:7
 
 ##create new variable names for pretty plotting
-pretty_names <- tibble(var = colnames(master_v3_interp)) %>% 
-  mutate(code = case_when(var==var[8:33] ~ str_replace(var,"^(\\w{3}).*?_(\\w).*?_(\\w).*$", "\\1\\2\\3"),
-                          var==var[34:45] ~ str_remove(var,"_") %>% str_sub(1,4),
-                          T ~var))
-  #diatoms will be First three letters of genus, First letters of species and sub species
-  rename_with(
-    .cols = c(8:33),
-    .fn = ~ .x %>%
-      str_replace("^(\\w{3}).*?_(\\w).*?_(\\w).*$", "\\1\\2\\3") %>%
-      str_to_upper()) %>%
-  #pigments will be first 4 characters
-  rename_with(
-    .cols = c(34:45),
-    .fn = ~ .x %>%
-      str_remove("_") %>%
-      str_sub(1,4) %>%
-      str_to_upper())
+pretty_names <- function(x) {
+  parts <- str_split_fixed(x, "_", 3)  # split each name into up to 3 parts
   
-#export diatoms and pigments with abbr. as a key
+  pre  <- str_sub(parts[,1], 1, 3)                  # first 3 chars of first part
+  mid  <- ifelse(parts[,2] != "", str_sub(parts[,2], 1, 2), "")  # first 2 chars of second part (if any)
+  post <- ifelse(parts[,3] != "", str_sub(parts[,3], 1, 1), "")  # first char of third part (if any)
+  
+  str_to_upper(paste0(pre, mid, post))
+}
+
+pretty_name_code <- tibble(var = colnames(master_v3_interp)) %>% 
+  mutate(code = case_when(row_number() %in% 8:45 ~ pretty_names(var), #change only diatoms and pigments
+                          T ~ var)) %>%
+  #manually change BCA to BCAR
+  mutate(code = case_when(code=="BCA" ~ "BCAR",
+                          T ~ code))
+  
+#check to make sure all codes are unique
+length(unique(pretty_name_code$code))
+  
+###change master data to have pretty column names
+name_map <- setNames(pretty_name_code$code, pretty_name_code$var)
+# rename columns in the dataset
+master_v3_interp <- master_v3_interp %>%
+  rename_with(~ name_map[.x], .cols = names(name_map))
 
 #standardize diatoms
 diat.stand.hell <- vegan::decostand(master_v3_interp[,8:33], method="hellinger")
@@ -159,7 +165,7 @@ ggplot(aes(X1, X2),data=site.comb) +
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
   ggrepel::geom_label_repel(data=pig.vec.sig.scaled,
-            aes(x=X1*1.15, y=X2*1.15),label=rownames(pig.vec.sig.scaled), 
+            aes(x=X1*1.01, y=X2*1.01),label=rownames(pig.vec.sig.scaled), 
             color="darkgreen",label.size=NA,fill=NA,
             force_pull=2) +  
   #diatom vectors
@@ -167,7 +173,7 @@ ggplot(aes(X1, X2),data=site.comb) +
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
   ggrepel::geom_label_repel(data=diat.vec.sig.scaled,
-            aes(x=X1*1.15, y=X2*1.15),label=rownames(diat.vec.sig.scaled), 
+            aes(x=X1*1.01, y=X2*1.01),label=rownames(diat.vec.sig.scaled), 
             color="orange", label.size=NA,fill=NA,
             force_pull=2) +
   #geochem vectors
@@ -187,8 +193,8 @@ ggplot(aes(X1, X2),data=site.comb) +
                               "#665191", #etwin
                               "#d45087", #finger
                               "#7A871E", #flame
-                              "#104210", #smoke
-                              "#E97451" #wtwin
+                              "#ebdcff", #smoke
+                              "#ffd8c9" #wtwin
   )) +
   theme_classic(base_size=14) 
 
