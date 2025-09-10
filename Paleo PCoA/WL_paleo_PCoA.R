@@ -65,6 +65,27 @@ colnames(master_v3_interp)
 #pigments=34:45
 #geochem=4:7
 
+##create new variable names for pretty plotting
+pretty_names <- tibble(var = colnames(master_v3_interp)) %>% 
+  mutate(code = case_when(var==var[8:33] ~ str_replace(var,"^(\\w{3}).*?_(\\w).*?_(\\w).*$", "\\1\\2\\3"),
+                          var==var[34:45] ~ str_remove(var,"_") %>% str_sub(1,4),
+                          T ~var))
+  #diatoms will be First three letters of genus, First letters of species and sub species
+  rename_with(
+    .cols = c(8:33),
+    .fn = ~ .x %>%
+      str_replace("^(\\w{3}).*?_(\\w).*?_(\\w).*$", "\\1\\2\\3") %>%
+      str_to_upper()) %>%
+  #pigments will be first 4 characters
+  rename_with(
+    .cols = c(34:45),
+    .fn = ~ .x %>%
+      str_remove("_") %>%
+      str_sub(1,4) %>%
+      str_to_upper())
+  
+#export diatoms and pigments with abbr. as a key
+
 #standardize diatoms
 diat.stand.hell <- vegan::decostand(master_v3_interp[,8:33], method="hellinger")
 #diatom distance matrix
@@ -98,6 +119,7 @@ site.comb <- data.frame(scores(comb.mds))
 site.comb$lake <- master_v3_interp$lake
 site.comb$year <- master_v3_interp$year_loess
 
+glimpse(site.comb)
 #combined vectors for all vars
 comb.vec <- envfit(comb.mds, env=master_v3_interp[,-3],na.rm=T) #include all paleo vars except depth
 comb.vec <- data.frame(cbind(comb.vec$vectors$arrows, comb.vec$vectors$r, comb.vec$vectors$pvals))
@@ -105,11 +127,11 @@ comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.05 & comb.vec$V3 >= 0.6) #only
 #just diatom vectors
 diat.vec <- envfit(comb.mds,env=master_v3_interp[,8:33],na.rm=T)
 diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
-diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.6)
+diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.5)
 #just pigment vectors
 pig.vec <- envfit(comb.mds,env=master_v3_interp[,34:45],na.rm=T)
 pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
-pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.6)
+pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.5)
 #just geochem vectors
 # geochem.vec <- envfit(comb.mds,env=master_v3_interp[,c(4:7)],na.rm=T)
 # geochem.vec <- data.frame(cbind(geochem.vec$vectors$arrows, geochem.vec$vectors$r, geochem.vec$vectors$pvals))
@@ -117,11 +139,11 @@ pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.6)
 
 # Scale arrows by r2 to show correlation strength
 pig.vec.sig.scaled <- pig.vec.sig %>%
-  mutate(X1 = (X1*V3)/2,
-         X2 = (X2*V3)/2)
+  mutate(X1 = (X1*V3)/1.5,
+         X2 = (X2*V3)/1.5)
 diat.vec.sig.scaled <- diat.vec.sig %>%
-  mutate(X1 = (X1*V3)/2,
-         X2 = (X2*V3)/2)
+  mutate(X1 = (X1*V3)/1.5,
+         X2 = (X2*V3)/1.5)
 # geochem.vec.sig.scaled <- geochem.vec.sig %>%
 #   mutate(X1 = (X1*V3)/2,
 #          X2 = (X2*V3)/2)
@@ -137,24 +159,28 @@ ggplot(aes(X1, X2),data=site.comb) +
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
   ggrepel::geom_label_repel(data=pig.vec.sig.scaled,
-            aes(x=X1*1.25, y=X2*1.25),label=rownames(pig.vec.sig.scaled), 
-            color="darkgreen",label.size=NA,fill=NA) +  
+            aes(x=X1*1.15, y=X2*1.15),label=rownames(pig.vec.sig.scaled), 
+            color="darkgreen",label.size=NA,fill=NA,
+            force_pull=2) +  
   #diatom vectors
   geom_segment(data=diat.vec.sig.scaled,
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
   ggrepel::geom_label_repel(data=diat.vec.sig.scaled,
-            aes(x=X1*1.25, y=X2*1.25),label=rownames(diat.vec.sig.scaled), 
-            color="orange", label.size=NA,fill=NA) +
+            aes(x=X1*1.15, y=X2*1.15),label=rownames(diat.vec.sig.scaled), 
+            color="orange", label.size=NA,fill=NA,
+            force_pull=2) +
   #geochem vectors
   # geom_segment(data=geochem.vec.sig.scaled,
   #              aes(x=0,y=0,xend=X1,yend=X2), 
   #              color="hotpink",arrow=arrow(length=unit(0.15, "inches"))) + 
-  # ggrepel::geom_label_repel(data=geochem.vec.sig.scaled,
+  # ggrepel::geom_label_repel(data=geochem.vec.sig.scaled,http://127.0.0.1:45277/graphics/plot_zoom_png?width=866&height=636
   #           aes(x=X1*1.25, y=X2*1.25),label=rownames(geochem.vec.sig.scaled), 
   #           color="hotpink", label.size=NA,fill=NA) +
   #general aesthetics
   labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+  scale_x_continuous(limits=c(-0.75,0.75))+
+  scale_y_continuous(limits=c(-0.75,0.75))+
   scale_color_manual(values=c("#C1D9B7", #burnt
                               "#89CFF0", #dunnigan
                               "#007CAA", #elbow
