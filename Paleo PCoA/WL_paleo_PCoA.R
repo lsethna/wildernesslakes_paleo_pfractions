@@ -280,10 +280,10 @@ for (i in 1:length(mixing_regime)) {
                                                                   lake=="dunnigan" ~ "#89CFF0",
                                                                   lake=="elbow" ~ "#007CAA",
                                                                   lake=="etwin" ~ "#665191",
-                                                                  lake=="finger" ~"#d45087",
-                                                                  lake=="flame" ~"#7A871E",
-                                                                  lake=="smoke" ~ "#104210",
-                                                                  lake=="wtwin" ~"#E97451") )
+                                                                  lake=="finger" ~ "#d45087",
+                                                                  lake=="flame" ~ "#7A871E",
+                                                                  lake=="smoke" ~ "#ebdcff",
+                                                                  lake=="wtwin" ~ "#ffd8c9")) 
 
   p <- 
   ggplot(aes(Dim1, Dim2),data=comb.scores.mix) +  
