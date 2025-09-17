@@ -56,9 +56,9 @@ ggplot(master_v3_interp,aes(x=year_loess,y=depth))+
 setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
 write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_4Sep25.csv")
 
-## -------------- ##
-## ---- PCoA ---- ##
-## -------------- ##
+## --------------------------------------------------------------------------- ##
+## -------------------------- PCoA all lakes together ------------------------ ##
+## --------------------------------------------------------------------------- ##
 
 colnames(master_v3_interp)
 #diatoms=8:33
@@ -126,15 +126,11 @@ site.comb$lake <- master_v3_interp$lake
 site.comb$year <- master_v3_interp$year_loess
 
 glimpse(site.comb)
-#combined vectors for all vars
-comb.vec <- envfit(comb.mds, env=master_v3_interp[,-3],na.rm=T) #include all paleo vars except depth
-comb.vec <- data.frame(cbind(comb.vec$vectors$arrows, comb.vec$vectors$r, comb.vec$vectors$pvals))
-comb.vec.sig <- subset(comb.vec, comb.vec$V4 <= 0.05 & comb.vec$V3 >= 0.6) #only saves vectors that are significant (p<0.05) and are >60% correlated with ordination
-#just diatom vectors
+#diatom vectors
 diat.vec <- envfit(comb.mds,env=master_v3_interp[,8:33],na.rm=T)
 diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
-diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.5)
-#just pigment vectors
+diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.5) #only saves vectors that are significant (p<0.05) and are >50% correlated with ordination
+#pigment vectors
 pig.vec <- envfit(comb.mds,env=master_v3_interp[,34:45],na.rm=T)
 pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
 pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.5)
@@ -143,11 +139,13 @@ pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.5)
 # geochem.vec <- data.frame(cbind(geochem.vec$vectors$arrows, geochem.vec$vectors$r, geochem.vec$vectors$pvals))
 # geochem.vec.sig <- subset(geochem.vec, geochem.vec$V4 <= 0.05 & geochem.vec$V3 >= 0.6)
 
+#combine pigment and diatom vectors
+diat.vec.sig$var <- "diatom"
+pig.vec.sig$var <- "pigment"
+comb.vec.sig <- rbind(diat.vec.sig,pig.vec.sig)
+
 # Scale arrows by r2 to show correlation strength
-pig.vec.sig.scaled <- pig.vec.sig %>%
-  mutate(X1 = (X1*V3)/1.5,
-         X2 = (X2*V3)/1.5)
-diat.vec.sig.scaled <- diat.vec.sig %>%
+comb.vec.sig.scaled <- comb.vec.sig %>%
   mutate(X1 = (X1*V3)/1.5,
          X2 = (X2*V3)/1.5)
 # geochem.vec.sig.scaled <- geochem.vec.sig %>%
@@ -160,22 +158,25 @@ ggplot(aes(X1, X2),data=site.comb) +
   geom_path(aes(color=lake), size=0.75, 
             arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
             lineend="round") + 
-  #pigment vectors
-  geom_segment(data=pig.vec.sig.scaled,
+  #vectors
+  geom_segment(data=comb.vec.sig.scaled,
                aes(x=0,y=0,xend=X1,yend=X2), 
-               color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
-  ggrepel::geom_label_repel(data=pig.vec.sig.scaled,
-            aes(x=X1*1.01, y=X2*1.01),label=rownames(pig.vec.sig.scaled), 
-            color="darkgreen",label.size=NA,fill=NA,
-            force_pull=2) +  
-  #diatom vectors
-  geom_segment(data=diat.vec.sig.scaled,
-               aes(x=0,y=0,xend=X1,yend=X2), 
-               color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
-  ggrepel::geom_label_repel(data=diat.vec.sig.scaled,
-            aes(x=X1*1.01, y=X2*1.01),label=rownames(diat.vec.sig.scaled), 
-            color="orange", label.size=NA,fill=NA,
-            force_pull=2) +
+               color="gray") + 
+  geom_point(data=comb.vec.sig.scaled,
+             aes(x=X1,y=X2,fill=var))+
+  ggrepel::geom_label_repel(data=comb.vec.sig.scaled,
+            aes(x=X1, y=X2),label=rownames(comb.vec.sig.scaled), size=3,
+            label.size=NA,fill=NA) +  
+  # #diatom vectors
+  # geom_segment(data=diat.vec.sig.scaled,
+  #              aes(x=0,y=0,xend=X1,yend=X2), 
+  #              color="gray") + 
+  # geom_point(data=diat.vec.sig.scaled,
+  #            aes(x=X1,y=X2),color="orange")+
+  # ggrepel::geom_label_repel(data=diat.vec.sig.scaled,
+  #           aes(x=X1*1.01, y=X2*1.01),label=rownames(diat.vec.sig.scaled), size=5,
+  #           color="orange", label.size=NA,fill=NA,
+  #           force_pull=2) +
   #geochem vectors
   # geom_segment(data=geochem.vec.sig.scaled,
   #              aes(x=0,y=0,xend=X1,yend=X2), 
@@ -371,13 +372,14 @@ for (i in 1:length(lakes)) {
                                   pig.vec.lake$vectors$r, 
                                   pig.vec.lake$vectors$pvals),
                             var_type="pigment")
-  #save these to list
-  vec.lake <- rbind(diat.vec.lake,pig.vec.lake) %>% mutate(lake=lakes[i])
-  pcoa.variable.vectors.lake[[i]] <- vec.lake
   
   #keep only significant vectors for plotting
   diat.vec.lake.sig <- subset(diat.vec.lake, diat.vec.lake$V4 <= 0.05 & diat.vec.lake$V3 >= 0.5)
   pig.vec.lake.sig <- subset(pig.vec.lake, pig.vec.lake$V4 <= 0.05 & pig.vec.lake$V3 >= 0.5)
+  
+  #save these to list
+  vec.lake <- rbind(diat.vec.lake.sig,pig.vec.lake.sig) %>% mutate(lake=lakes[i])
+  pcoa.variable.vectors.lake[[i]] <- vec.lake
   
   # Scale arrows by r2 to show correlation strength
   diat.vec.lake.sig.scaled <- diat.vec.lake.sig %>%
@@ -397,18 +399,18 @@ for (i in 1:length(lakes)) {
     #pigment vectors
     geom_segment(data=pig.vec.lake.sig.scaled,
                  aes(x=0,y=0,xend=Dim1,yend=Dim2), 
-                 color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+                 color="darkgreen") + 
     geom_text(data=pig.vec.lake.sig.scaled,
-              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(pig.vec.lake.sig.scaled), 
-              color="darkgreen", size=4,vjust=-0.5,
+              aes(x=Dim1, y=Dim2),label=rownames(pig.vec.lake.sig.scaled), 
+              color="darkgreen", size=3,vjust=-0.5,
               position=position_jitter(width=0.1,height=0.1)) +  
     #diatom vectors
     geom_segment(data=diat.vec.lake.sig.scaled,
                  aes(x=0,y=0,xend=Dim1,yend=Dim2), 
-                 color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+                 color="orange") + 
     geom_text(data=diat.vec.lake.sig.scaled,
-              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(diat.vec.lake.sig.scaled), 
-              color="orange", size=4,vjust=-0.5,
+              aes(x=Dim1, y=Dim2),label=rownames(diat.vec.lake.sig.scaled), 
+              color="orange", size=3,vjust=-0.5,
               position=position_jitter(width=0.1,height=0.1)) +
     #general aesthetics
     ggtitle(lake_plot_titles[i]) +
