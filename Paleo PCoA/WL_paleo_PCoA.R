@@ -85,6 +85,8 @@ pretty_name_code <- tibble(var = colnames(master_v3_interp)) %>%
   
 #check to make sure all codes are unique
 length(unique(pretty_name_code$code))
+#export
+write.csv(pretty_name_code,file="pcoa_variable_abbr.csv")
   
 ###change master data to have pretty column names
 name_map <- setNames(pretty_name_code$code, pretty_name_code$var)
