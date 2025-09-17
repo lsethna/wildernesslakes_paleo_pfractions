@@ -52,31 +52,52 @@ glimpse(bsi)
 #Make both lists so you can plot them together using cowplot
 #make plot
 wt_perc <- 
-bsi %>%
-  ggplot(aes(y=wt_percent,x=date))+
-  geom_line()+
-  coord_flip()+
-  theme_bw()+
-  ylab("wt % BSi")+
-  facet_grid(rows=vars(lake),scales="free")+
-  theme(strip.placement="outside")
+bsi_dat %>%
+  #pretty up lake names and order
+  mutate(lake = case_when(lake=="burnt"~"Burnt",
+                          lake=="dunnigan"~"Dunnigan",
+                          lake=="elbow"~"Elbow",
+                          lake=="etwin"~"East Twin",
+                          lake=="finger"~"Finger",
+                          lake=="flame"~"Flame",
+                          lake=="smoke"~"Smoke",
+                          lake=="wtwin"~"West Twin")) %>%
+  mutate(lake = factor(lake, 
+                       levels=c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin"),
+                       labels=c("(a) Dunnigan","(b) Finger",
+                                      "(c) Burnt","(d) Smoke",
+                                      "(e) Elbow","(f) East Twin",
+                                      "(g) Flame","(h) West Twin"))) %>%
+  #plot
+  ggplot(aes(x=wt_percent,y=date))+
+  geom_path(color="gray40",linewidth=0.75)+
+  theme_classic()+
+  xlab("Sediment weight % BSi")+
+  scale_y_continuous(limits=c(1830,2030),breaks=seq(1830,2030,50))+
+  facet_wrap(~lake,scales="free_x",axes="all_y",nrow=4)+
+  theme(strip.background=element_blank(),
+        strip.text=element_text(hjust=0,size=11),
+        axis.title.y=element_blank())
 
+wt_perc
 
 #make plot
 flux_si <- 
-bsi %>%
+bsi_dat %>%
   ggplot(aes(y=flux_mg,x=date))+
   geom_line()+
   coord_flip()+
-  theme_bw()+
+  theme_classic()+
   facet_grid(rows=vars(lake),scales="free")+
   ylab("Flux SiO2(mg/cm2 yr)")+
-  theme(strip.placement="outside")
-
+  facet_wrap(~lake,scales="free",nrow=8)+
+  theme(strip.background=element_blank(),
+        axis.title.y=element_blank())
 
 library(cowplot)
 
 cowplot::plot_grid(wt_perc,flux_si)
+
 
 #Just change "lake" and make new graph
 
