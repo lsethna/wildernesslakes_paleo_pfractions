@@ -198,9 +198,9 @@ ggplot(aes(X1, X2),data=site.comb) +
   )) +
   theme_classic(base_size=14) 
 
-## ------------------------------------- ##
-## ---- PCoA for each mixing regime ---- ##
-## ------------------------------------- ##
+## ---------------------------------------------------------------------------- ##
+## --------------------- PCoA for each mixing regime -------------------------- ##
+## ---------------------------------------------------------------------------- ##
 
 #add mix regime to master data
 master_v3_interp <- master_v3_interp %>%
@@ -318,201 +318,109 @@ for (i in 1:length(mixing_regime)) {
 
 cowplot::plot_grid(pcoa.plots[[2]],pcoa.plots[[1]],pcoa.plots[[3]],ncol=3)
 
-## ----------------------------------------------------------- ##
-## ---- PCoA for one lake representing each mixing regime ---- ##
-## ----------------------------------------------------------- ##
+## --------------------------------------------------------------------------- ##
+## -------------------------- PCoA for each lake ----------------------------- ##
+## --------------------------------------------------------------------------- ##
 
-#create new dfs for one lake in each mixing regime
-burnt.master.dat <- subset(poly.master.dat,poly.master.dat$lake=="burnt")
-finger.master.dat <- subset(mixed.master.dat,mixed.master.dat$lake=="finger")
-wtwin.master.dat <- subset(di.master.dat,di.master.dat$lake=="wtwin")
+#set up variables to run PcoA for each lake in a loop
+unique(master_v3_interp$lake)
+#put in order for plotting
+lakes = c("dunnigan","finger","burnt","smoke","elbow","etwin","flame","wtwin")
+#make list of plot titles
+lake_plot_titles <- c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin")
 
-#check
-glimpse(wtwin.master.dat)
-colnames(finger.master.dat)
+pcoa.scores_lake <- list() #list to save scores output
+pcoa.variable.vectors.lake <- list() #list to save variable vectors
+pcoa.plots.lake <- list() #list to save PCoA plots
 
-#standardize geochemistry
-geochem.stand.hell.burnt <- decostand(burnt.master.dat[,c(4,8,13)],method="hellinger")
-geochem.stand.hell.finger <- decostand(finger.master.dat[,c(4,8,13)],method="hellinger")
-geochem.stand.hell.wtwin <- decostand(wtwin.master.dat[,c(4,8,13)],method="hellinger")
-#geochemistry distance matrix
-geochem.dist.burnt <- dist(geochem.stand.hell.burnt, method="euclidean")
-geochem.dist.finger <- dist(geochem.stand.hell.finger, method="euclidean")
-geochem.dist.wtwin <- dist(geochem.stand.hell.wtwin, method="euclidean")
+for (i in 1:length(lakes)) {
+  #create df for each mixing regime
+  lake.master.dat <- subset(master_v3_interp,master_v3_interp$lake==lakes[i])
+  
+  #standardize diatoms and pigments... 
+  diat.stand.hell.lake <- decostand(lake.master.dat[,8:33], method="hellinger")
+  pig.stand.hell.lake <- decostand(lake.master.dat[,34:45], method="hellinger")
+  #...to create distance matrices
+  diat.dist.lake <- dist(diat.stand.hell.lake, method="euclidean")
+  pig.dist.lake <- dist(pig.stand.hell.lake, method="euclidean")
+  
+  #combine distance matrices...
+  comb.dist.lake <- diat.dist.lake+pig.dist.lake
+  #...and scale
+  comb.mds.lake <- cmdscale(d=comb.dist.lake, k=2)
+  
+  #get scores
+  comb.scores.lake <- data.frame(scores(comb.mds.lake))
+  #add sample IDs
+  comb.scores.lake$lake <- lake.master.dat$lake
+  comb.scores.lake$year <- lake.master.dat$year_loess
+  
+  #save to list
+  pcoa.scores_lake[[i]] <- comb.scores.lake
+  
+  #calculate vectors for diatoms and pigments
+  #diatom vectors
+  diat.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,8:33],na.rm=T)
+  diat.vec.lake <- data.frame(cbind(diat.vec.lake$vectors$arrows, 
+                                   diat.vec.lake$vectors$r, 
+                                   diat.vec.lake$vectors$pvals),
+                             var_type="diatoms")
+  #pigments
+  pig.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,34:45],na.rm=T)
+  pig.vec.lake <- data.frame(cbind(pig.vec.lake$vectors$arrows, 
+                                  pig.vec.lake$vectors$r, 
+                                  pig.vec.lake$vectors$pvals),
+                            var_type="pigment")
+  #save these to list
+  vec.lake <- rbind(diat.vec.lake,pig.vec.lake) %>% mutate(lake=lakes[i])
+  pcoa.variable.vectors.lake[[i]] <- vec.lake
+  
+  #keep only significant vectors for plotting
+  diat.vec.lake.sig <- subset(diat.vec.lake, diat.vec.lake$V4 <= 0.05 & diat.vec.lake$V3 >= 0.5)
+  pig.vec.lake.sig <- subset(pig.vec.lake, pig.vec.lake$V4 <= 0.05 & pig.vec.lake$V3 >= 0.5)
+  
+  # Scale arrows by r2 to show correlation strength
+  diat.vec.lake.sig.scaled <- diat.vec.lake.sig %>%
+    mutate(Dim1 = (Dim1*V3)/2,
+           Dim2 = (Dim2*V3)/2)
+  pig.vec.lake.sig.scaled <- pig.vec.lake.sig %>%
+    mutate(Dim1 = (Dim1*V3)/2,
+           Dim2 = (Dim2*V3)/2)
+  
+  #create PCoA biplot
 
-geochem.dist.burnt <- geochem.dist.burnt/max(geochem.dist.burnt)
-geochem.dist.finger <- geochem.dist.finger/max(geochem.dist.finger)
-geochem.dist.wtwin <- geochem.dist.wtwin/max(geochem.dist.wtwin)
+  p <- 
+    ggplot(aes(Dim1, Dim2),data=comb.scores.lake) +  
+    #lake trajectories 
+    geom_path(color="black", size=0.75, 
+              arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
+    #pigment vectors
+    geom_segment(data=pig.vec.lake.sig.scaled,
+                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+                 color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
+    geom_text(data=pig.vec.lake.sig.scaled,
+              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(pig.vec.lake.sig.scaled), 
+              color="darkgreen", size=4,vjust=-0.5,
+              position=position_jitter(width=0.1,height=0.1)) +  
+    #diatom vectors
+    geom_segment(data=diat.vec.lake.sig.scaled,
+                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
+                 color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
+    geom_text(data=diat.vec.lake.sig.scaled,
+              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(diat.vec.lake.sig.scaled), 
+              color="orange", size=4,vjust=-0.5,
+              position=position_jitter(width=0.1,height=0.1)) +
+    #general aesthetics
+    ggtitle(lake_plot_titles[i]) +
+    theme_classic()+
+    theme(axis.title=element_blank(),
+          title=element_text(size=11),
+          axis.text=element_text(size=10))
+  
+  pcoa.plots[[i]] <- p
+}
 
-#standardize diatoms
-diat.stand.hell.burnt <- decostand(burnt.master.dat[,16:31], method="hellinger")
-diat.stand.hell.finger <- decostand(finger.master.dat[,16:31], method="hellinger")
-diat.stand.hell.wtwin <- decostand(wtwin.master.dat[,16:31], method="hellinger")
-#diatom distance matrix
-diat.dist.burnt <- dist(diat.stand.hell.burnt, method="euclidean")
-diat.dist.finger <- dist(diat.stand.hell.finger, method="euclidean")
-diat.dist.wtwin <- dist(diat.stand.hell.wtwin, method="euclidean")
+cowplot::plot_grid(plotlist=pcoa.plots,ncol=2,
+                   labels=c("(a)","(b)","(c)","(d)","(e)","(f)","(g)","(h)"),
+                   label_fontface="plain")
 
-diat.dist.burnt <- diat.dist.burnt/max(diat.dist.burnt)
-diat.dist.finger <- diat.dist.finger/max(diat.dist.finger)
-diat.dist.wtwin <- diat.dist.wtwin/max(diat.dist.wtwin)
-
-#standardize pigments
-pig.stand.hell.burnt <- decostand(burnt.master.dat[,32:51], method="hellinger")
-pig.stand.hell.finger <- decostand(finger.master.dat[,32:51], method="hellinger")
-pig.stand.hell.wtwin <- decostand(wtwin.master.dat[,32:51], method="hellinger")
-#pigment distance matrix
-pig.dist.burnt <- dist(pig.stand.hell.burnt, method="euclidean")
-pig.dist.finger <- dist(pig.stand.hell.finger, method="euclidean")
-pig.dist.wtwin <- dist(pig.stand.hell.wtwin, method="euclidean")
-
-pig.dist.burnt <- pig.dist.burnt/max(pig.dist.burnt)
-pig.dist.finger <- pig.dist.finger/max(pig.dist.finger)
-pig.dist.wtwin <- pig.dist.wtwin/max(pig.dist.wtwin)
-
-#combine distance matrices
-burnt.comb.dist <- geochem.dist.burnt+diat.dist.burnt+pig.dist.burnt
-finger.comb.dist <- geochem.dist.finger+diat.dist.finger+pig.dist.finger
-wtwin.comb.dist <- geochem.dist.wtwin+diat.dist.wtwin+pig.dist.wtwin
-
-#and scale
-burnt.comb.mds <- cmdscale(d=burnt.comb.dist, k=2)
-finger.comb.mds <- cmdscale(d=finger.comb.dist, k=2)
-wtwin.comb.mds <- cmdscale(d=wtwin.comb.dist, k=2)
-#plot
-plot(burnt.comb.mds)
-plot(finger.comb.mds)
-plot(wtwin.comb.mds)
-#get scores
-burnt.comb.scores <- data.frame(scores(burnt.comb.mds))
-finger.comb.scores <- data.frame(scores(finger.comb.mds))
-wtwin.comb.scores <- data.frame(scores(wtwin.comb.mds))
-
-#add site IDs
-burnt.comb.scores$lake <- burnt.master.dat$lake
-burnt.comb.scores$year <- burnt.master.dat$year_loess
-finger.comb.scores$lake <- finger.master.dat$lake
-finger.comb.scores$year <- finger.master.dat$year_loess
-wtwin.comb.scores$lake <- wtwin.master.dat$lake
-wtwin.comb.scores$year <- wtwin.master.dat$year_loess
-
-## geochem, diatom, and pigment vectors for each mixing regime ##
-#burnt geochem vectors
-burnt.geo.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,c(4,8,13)],na.rm=T)
-burnt.geo.vec <- data.frame(cbind(burnt.geo.vec$vectors$arrows, 
-                                  burnt.geo.vec$vectors$r, 
-                                  burnt.geo.vec$vectors$pvals))
-burnt.geo.vec.sig <- subset(burnt.geo.vec, burnt.geo.vec$V4 <= 0.001 & burnt.geo.vec$V3 >= 0.5)
-#finger geochem vectors
-finger.geo.vec <- envfit(finger.comb.mds,env=finger.master.dat[,c(4,8,13)],na.rm=T)
-finger.geo.vec <- data.frame(cbind(finger.geo.vec$vectors$arrows, 
-                                   finger.geo.vec$vectors$r, 
-                                   finger.geo.vec$vectors$pvals))
-finger.geo.vec.sig <- subset(finger.geo.vec, finger.geo.vec$V4 <= 0.001 & finger.geo.vec$V3 >= 0.5)
-#wtwin geochem vectors
-wtwin.geo.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,c(4,8,13)],na.rm=T)
-wtwin.geo.vec <- data.frame(cbind(wtwin.geo.vec$vectors$arrows, 
-                                  wtwin.geo.vec$vectors$r, 
-                                  wtwin.geo.vec$vectors$pvals))
-wtwin.geo.vec.sig <- subset(wtwin.geo.vec, wtwin.geo.vec$V4 <= 0.001 & wtwin.geo.vec$V3 >= 0.5)
-
-#Burnt diatom vectors
-burnt.diat.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,16:31],na.rm=T)
-burnt.diat.vec <- data.frame(cbind(burnt.diat.vec$vectors$arrows, 
-                                   burnt.diat.vec$vectors$r, 
-                                   burnt.diat.vec$vectors$pvals))
-burnt.diat.vec.sig <- subset(burnt.diat.vec, burnt.diat.vec$V4 <= 0.001 & burnt.diat.vec$V3 >= 0.5)
-#finger mixed diatom vectors
-finger.diat.vec <- envfit(finger.comb.mds,env=finger.master.dat[,16:31],na.rm=T)
-finger.diat.vec <- data.frame(cbind(finger.diat.vec$vectors$arrows, 
-                                   finger.diat.vec$vectors$r, 
-                                   finger.diat.vec$vectors$pvals))
-finger.diat.vec.sig <- subset(finger.diat.vec, finger.diat.vec$V4 <= 0.001 & finger.diat.vec$V3 >= 0.5)
-#wtwin diatom vectors
-wtwin.diat.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,16:31],na.rm=T)
-wtwin.diat.vec <- data.frame(cbind(wtwin.diat.vec$vectors$arrows, 
-                                wtwin.diat.vec$vectors$r, 
-                                wtwin.diat.vec$vectors$pvals))
-wtwin.diat.vec.sig <- subset(wtwin.diat.vec, wtwin.diat.vec$V4 <= 0.001 & wtwin.diat.vec$V3 >= 0.5)
-#burnt pigment vectors
-burnt.pig.vec <- envfit(burnt.comb.mds,env=burnt.master.dat[,32:51],na.rm=T)
-burnt.pig.vec <- data.frame(cbind(burnt.pig.vec$vectors$arrows, 
-                                 burnt.pig.vec$vectors$r, 
-                                 burnt.pig.vec$vectors$pvals))
-burnt.pig.vec.sig <- subset(burnt.pig.vec, burnt.pig.vec$V4 <= 0.001 & burnt.pig.vec$V3 >= 0.5)
-#finger pigment vectors
-finger.pig.vec <- envfit(finger.comb.mds,env=finger.master.dat[,32:51],na.rm=T)
-finger.pig.vec <- data.frame(cbind(finger.pig.vec$vectors$arrows, 
-                                  finger.pig.vec$vectors$r, 
-                                  finger.pig.vec$vectors$pvals))
-finger.pig.vec.sig <- subset(finger.pig.vec, finger.pig.vec$V4 <= 0.001 & finger.pig.vec$V3 >= 0.5)
-#wtwin pigment vectors
-wtwin.pig.vec <- envfit(wtwin.comb.mds,env=wtwin.master.dat[,32:51],na.rm=T)
-wtwin.pig.vec <- data.frame(cbind(wtwin.pig.vec$vectors$arrows, 
-                               wtwin.pig.vec$vectors$r, 
-                               wtwin.pig.vec$vectors$pvals))
-wtwin.pig.vec.sig <- subset(wtwin.pig.vec, wtwin.pig.vec$V4 <= 0.001 & wtwin.pig.vec$V3 >= 0.5)
-
-#create PCoA plots
-burnt.pcoa <- 
-ggplot(aes(Dim1, Dim2), data=burnt.comb.scores) +  
-  geom_segment(aes(x=rep(0, nrow(burnt.geo.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(burnt.geo.vec.sig)),yend=Dim2),
-               colour="hotpink", data=burnt.geo.vec.sig) +
-  geom_segment(aes(x=rep(0, nrow(burnt.diat.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(burnt.diat.vec.sig)),yend=Dim2),
-               colour="orange", data=burnt.diat.vec.sig) +
-  geom_segment(aes(x=rep(0, nrow(burnt.pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(burnt.pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=burnt.pig.vec.sig) + 
-  geom_text(aes(label=round(burnt.comb.scores$year,0)),size=3,position=position_jitter(width=0.1,height=0.1)) + 
-  geom_path(aes(Dim1, Dim2), arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), lineend="round") + 
-  geom_text(aes(x=Dim1, y=Dim2), data=burnt.geo.vec.sig, label=rownames(burnt.geo.vec.sig), colour="hotpink", size=4) +
-  geom_text(aes(x=Dim1, y=Dim2), data=burnt.diat.vec.sig, label=rownames(burnt.diat.vec.sig), colour="orange", size=4) +
-  geom_text(aes(x=Dim1, y=Dim2), data=burnt.pig.vec.sig, label=rownames(burnt.pig.vec.sig), colour="darkgreen", size=4) + 
-  scale_x_continuous(limits=c(-2,1.5),breaks=seq(-2,1.5,0.5))+
-  scale_y_continuous(limits=c(-1.5,2))+
-  ggtitle("Burnt Lake - Polymictic")+
-  theme_bw(base_size=14)
-finger.pcoa <- 
-ggplot(aes(Dim1, Dim2), data=finger.comb.scores) +  
-  geom_segment(aes(x=rep(0, nrow(finger.geo.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(finger.geo.vec.sig)),yend=Dim2),
-               colour="hotpink", data=finger.geo.vec.sig) +
-  geom_segment(aes(x=rep(0, nrow(finger.diat.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(finger.diat.vec.sig)),yend=Dim2),
-               colour="orange", data=finger.diat.vec.sig) +
-  geom_segment(aes(x=rep(0, nrow(finger.pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(finger.pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=finger.pig.vec.sig) + 
-  geom_text(aes(label=round(finger.comb.scores$year,0)),size=3,position=position_jitter(width=0.1,height=0.1)) + 
-  geom_path(aes(Dim1, Dim2), arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), lineend="round") + 
-  geom_text(aes(x=Dim1, y=Dim2), data=finger.geo.vec.sig, label=rownames(finger.geo.vec.sig), colour="hotpink", size=4) +
-  geom_text(aes(x=Dim1, y=Dim2), data=finger.diat.vec.sig, label=rownames(finger.diat.vec.sig), colour="orange", size=4) +
-  geom_text(aes(x=Dim1, y=Dim2), data=finger.pig.vec.sig, label=rownames(finger.pig.vec.sig), colour="darkgreen", size=4) + 
-  scale_x_continuous(limits=c(-2,1.5),breaks=seq(-2,1.5,0.5))+
-  scale_y_continuous(limits=c(-1.5,2))+
-  ggtitle("Finger Lake - Well mixed") +
-  theme_bw(base_size=14)
-wtwin.pcoa <- 
-ggplot(aes(Dim1, Dim2), data=wtwin.comb.scores) +  
-  geom_segment(aes(x=rep(0, nrow(wtwin.geo.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(wtwin.geo.vec.sig)),yend=Dim2),
-               colour="hotpink", data=wtwin.geo.vec.sig) +
-  geom_segment(aes(x=rep(0, nrow(wtwin.diat.vec.sig)),
-                   xend=Dim1, y=rep(0, nrow(wtwin.diat.vec.sig)),yend=Dim2),
-               colour="orange", data=wtwin.diat.vec.sig) +
-  geom_segment(aes(x=rep(0, nrow(wtwin.pig.vec.sig)), 
-                   xend=Dim1, y=rep(0, nrow(wtwin.pig.vec.sig)),yend=Dim2), 
-               colour="darkgreen", data=wtwin.pig.vec.sig) + 
-  geom_text(aes(label=round(wtwin.comb.scores$year,0)),size=3,position=position_jitter(width=0.1,height=0.1)) + 
-  geom_path(aes(Dim1, Dim2), arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), lineend="round") + 
-  geom_text(aes(x=Dim1, y=Dim2), data=wtwin.geo.vec.sig, label=rownames(wtwin.geo.vec.sig), colour="hotpink", size=4) +
-  geom_text(aes(x=Dim1, y=Dim2), data=wtwin.diat.vec.sig, label=rownames(wtwin.diat.vec.sig), colour="orange", size=4) +
-  geom_text(aes(x=Dim1, y=Dim2), data=wtwin.pig.vec.sig, label=rownames(wtwin.pig.vec.sig), colour="darkgreen", size=4) + 
-  scale_x_continuous(limits=c(-2,1.5),breaks=seq(-2,1.5,0.5))+
-  scale_y_continuous(limits=c(-1.5,2))+
-  ggtitle("West Twin - Dimictic") +
-  theme_bw(base_size=14)
-
-cowplot::plot_grid(burnt.pcoa,finger.pcoa,wtwin.pcoa,ncol=3)
