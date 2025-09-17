@@ -426,3 +426,8 @@ cowplot::plot_grid(plotlist=pcoa.plots,ncol=2,
                    labels=c("(a)","(b)","(c)","(d)","(e)","(f)","(g)","(h)"),
                    label_fontface="plain")
 
+#move rownames (important variables) to a column
+pcoa.variable.vectors.lake <- lapply(pcoa.variable.vectors.lake,tibble::rownames_to_column, var="var")
+pcoa.sig.variables.lake <- do.call(rbind,lapply(pcoa.variable.vectors.lake,as.data.frame))
+unique(pcoa.sig.variables.lake$lake)
+write.csv(pcoa.sig.variables.lake,file="sig_variables_pcoa_by_lake.csv")
