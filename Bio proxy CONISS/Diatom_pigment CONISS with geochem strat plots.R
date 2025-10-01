@@ -37,6 +37,7 @@ variable_code <- read.csv("Paleo PCoA/pcoa_variable_abbr.csv")
 ## --------------------------------------------------------------------------- ##
 
 lakes = unique(master_dat_v2$lake)
+pretty_lake_names = c("Burnt","Dunnigan","East Twin","Elbow","Finger","Flame","Smoke","West Twin")
 
 for (i in 1:length(lakes)){
 # Select data for strat plots
@@ -56,8 +57,15 @@ dist.mat <- vegdist(lake_dat[,-c(col_n_to_skip)],method="euclidian", binary=FALS
 #coniss cluster
 chclust.obj <- chclust(dist.mat,method="coniss")
 
-##here we can define the types of variables for color
-#and pretty them up for plotting
+#create a vector of colors based on variable type
+var_colors <- imp_variables %>% filter(lake==lakes[i]) %>% select(var_type)
+var_colors <- var_colors %>% mutate(color = case_when(var_type=="diatoms"~"#ffa500",
+                                                      var_type=="pigment"~"#006400"))
+strat_colors <- c(#colors for bio vars,
+  var_colors$color,
+  rep("hotpink",3) #for the three geochem vars
+  )
+
 #will also need to pretty up the lake names for the titles
 
 #run this to save plot
@@ -69,9 +77,9 @@ pdf(
 )
 
 strat.plot(lake_dat[,-1],yvar=lake_dat$year_loess, #[rows,col]
-           y.tks=seq(1830,2020,20),
-           plot.poly=T,plot.bar=T,col.bar="black",
-           srt.xlabel=45,title=paste(lakes[i]),
+           y.tks=seq(plyr::round_any(min(lake_dat$year_loess),10),2020,10),
+           plot.poly=T,plot.bar=F,col.poly=strat_colors,
+           srt.xlabel=45,title=pretty_lake_names[i],
            las=2,mgp=c(3,1,0.25),xSpace=0.01,
            clust=chclust.obj)
 

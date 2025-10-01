@@ -45,6 +45,7 @@ glimpse(master_v2)
 ## ------------------------------- ##
 master_v3_interp <- master_v2 %>%
   group_by(lake) %>%
+  #will replace NA values with interpolated values - done at every dated interval 
   mutate_at(vars(percent_organic:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
   ungroup() %>%
   drop_na() #remove any NA values - beyond dated intervals
@@ -165,27 +166,10 @@ ggplot(aes(X1, X2),data=site.comb) +
                aes(x=0,y=0,xend=X1,yend=X2), 
                color="gray") + 
   geom_point(data=comb.vec.sig.scaled,
-             aes(x=X1,y=X2,fill=var))+
-  ggrepel::geom_label_repel(data=comb.vec.sig.scaled,
-            aes(x=X1, y=X2),label=rownames(comb.vec.sig.scaled), size=3,
-            label.size=NA,fill=NA) +  
-  # #diatom vectors
-  # geom_segment(data=diat.vec.sig.scaled,
-  #              aes(x=0,y=0,xend=X1,yend=X2), 
-  #              color="gray") + 
-  # geom_point(data=diat.vec.sig.scaled,
-  #            aes(x=X1,y=X2),color="orange")+
-  # ggrepel::geom_label_repel(data=diat.vec.sig.scaled,
-  #           aes(x=X1*1.01, y=X2*1.01),label=rownames(diat.vec.sig.scaled), size=5,
-  #           color="orange", label.size=NA,fill=NA,
-  #           force_pull=2) +
-  #geochem vectors
-  # geom_segment(data=geochem.vec.sig.scaled,
-  #              aes(x=0,y=0,xend=X1,yend=X2), 
-  #              color="hotpink",arrow=arrow(length=unit(0.15, "inches"))) + 
-  # ggrepel::geom_label_repel(data=geochem.vec.sig.scaled,http://127.0.0.1:45277/graphics/plot_zoom_png?width=866&height=636
-  #           aes(x=X1*1.25, y=X2*1.25),label=rownames(geochem.vec.sig.scaled), 
-  #           color="hotpink", label.size=NA,fill=NA) +
+             aes(x=X1,y=X2,shape=var),color="gray",size=2)+
+  geom_text(data=comb.vec.sig.scaled,
+            aes(x=X1, y=X2),label=rownames(comb.vec.sig.scaled), size=4,
+            position=position_jitter(width=0.1,height=0.1))+
   #general aesthetics
   labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
   scale_x_continuous(limits=c(-0.75,0.75))+
