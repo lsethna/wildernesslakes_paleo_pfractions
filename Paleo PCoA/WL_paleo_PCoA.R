@@ -434,7 +434,7 @@ pcoa.scores_lake_df %>%
   group_by(lake,year_round) %>%
   summarize(Dim1 = median(Dim1)) %>%
 ggplot(aes(x=year_round,y=Dim1,color=lake))+
-  geom_vline(xintercept = 1940,lty="dashed")+
+  geom_vline(xintercept = 1900,lty="dashed")+
   geom_vline(xintercept = 1970,lty="dashed")+
   #geom_point()+
   geom_smooth(se=F)+
