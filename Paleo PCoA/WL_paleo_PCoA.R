@@ -417,3 +417,26 @@ pcoa.variable.vectors.lake <- lapply(pcoa.variable.vectors.lake,tibble::rownames
 pcoa.sig.variables.lake <- do.call(rbind,lapply(pcoa.variable.vectors.lake,as.data.frame))
 unique(pcoa.sig.variables.lake$lake)
 write.csv(pcoa.sig.variables.lake,file="sig_variables_pcoa_by_lake.csv")
+
+## plot up PCoA loadings over time for each lake
+pcoa.scores_lake_df <- dplyr::bind_rows(pcoa.scores_lake)
+glimpse(pcoa.scores_lake_df)
+
+#round year values to nearest 5, take average?
+round_to_nearest_10 <- function(x) {
+  10 * round(x / 10)
+}
+#test
+round_to_nearest_10(1986)
+
+pcoa.scores_lake_df %>%
+  mutate(year_round = round_to_nearest_10(year)) %>% 
+  group_by(lake,year_round) %>%
+  summarize(Dim1 = median(Dim1)) %>%
+ggplot(aes(x=year_round,y=Dim1,color=lake))+
+  geom_vline(xintercept = 1940,lty="dashed")+
+  geom_vline(xintercept = 1970,lty="dashed")+
+  #geom_point()+
+  geom_smooth(se=F)+
+  #geom_line(size=1)+
+  theme_classic()
