@@ -31,9 +31,10 @@ sel_pig <- sel_p %>%
 
 #filter master data based on selected diatoms and pigments
 master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
-                                   9:11, #loi; perc inorg,org,calc
+                                   #9:11, #loi; perc inorg,org,calc
                                    #16:23, #P and P fractions
-                                   14,sel_diat$name, #BSi flux, select diatoms
+                                   #14, #BSi flux
+                                   sel_diat$name, #select diatoms
                                    sel_pig$name, #select pigments
                                    #274:276 #TOC, TN, TOC:TN
 
@@ -46,7 +47,7 @@ glimpse(master_v2)
 master_v3_interp <- master_v2 %>%
   group_by(lake) %>%
   #will replace NA values with interpolated values - done at every dated interval 
-  mutate_at(vars(percent_organic:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
+  mutate_at(vars(ast_formosa:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
   ungroup() %>%
   drop_na() #remove any NA values - beyond dated intervals
 
