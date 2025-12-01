@@ -16,8 +16,8 @@ vars <- data.frame(
   column_n=1:length(master_dat),
   vars=colnames(master_dat))
 vars
-#pigments 25:56
-#diatoms 57:270
+#pigments 24:55
+#diatoms 56:269
 sel_diat <- master_dat %>% select(colnames(master_dat[,c(56:269)])) %>% 
   pivot_longer(cols=ach_microcephala:uln_ulna) %>% filter(value>5) %>% #filter to 5% relative abundance (might want to only filter to 2% and at least in two samples)
   select(name) %>% distinct()
@@ -56,18 +56,17 @@ ggplot(master_v3_interp,aes(x=year_loess,y=depth))+
   geom_line()+facet_wrap(~lake)
 
 setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
-write.csv(master_v3_interp,file="raw_data/interpolated_master_dat_4Sep25.csv")
-
-## --------------------------------------------------------------------------- ##
-## -------------------------- PCoA all lakes together ------------------------ ##
-## --------------------------------------------------------------------------- ##
+write.csv(master_v3_interp,file="raw_data/interpolated_diatom_pigment_dat_1Dec25.csv")
 
 colnames(master_v3_interp)
-#diatoms=8:33
-#pigments=34:45
-#geochem=4:7
+#diatoms=4:29
+#pigments=30:41
 
-##create new variable names for pretty plotting
+diat_pig_vars <- colnames(master_v3_interp)[4:41]
+
+## ------------------------------------------------------- ##
+## ---- create new variable names for pretty plotting ---- ##
+## ------------------------------------------------------- ##
 pretty_names <- function(x) {
   parts <- str_split_fixed(x, "_", 3)  # split each name into up to 3 parts
   
@@ -79,100 +78,115 @@ pretty_names <- function(x) {
 }
 
 pretty_name_code <- tibble(var = colnames(master_v3_interp)) %>% 
-  mutate(code = case_when(row_number() %in% 8:45 ~ pretty_names(var), #change only diatoms and pigments
+  mutate(code = case_when(var %in% diat_pig_vars ~ pretty_names(var), #change only diatoms and pigments
                           T ~ var)) %>%
   #manually change BCA to BCAR
   mutate(code = case_when(code=="BCA" ~ "BCAR",
                           T ~ code))
-  
+
 #check to make sure all codes are unique
 length(unique(pretty_name_code$code))
 #export
 write.csv(pretty_name_code,file="pcoa_variable_abbr.csv")
-  
+
 ###change master data to have pretty column names
 name_map <- setNames(pretty_name_code$code, pretty_name_code$var)
 # rename columns in the dataset
 master_v3_interp <- master_v3_interp %>%
   rename_with(~ name_map[.x], .cols = names(name_map))
 
+
+## --------------------------------------------------------------------------- ##
+## -------------------------- PCoA all lakes together ------------------------ ##
+## --------------------------------------------------------------------------- ##
+
+#check column names and numbers
+colnames(master_v3_interp)
+#diatoms 4:29
+#pigments 30:41
+
+## Calculate distance matrices
+
 #standardize diatoms
-diat.stand.hell <- vegan::decostand(master_v3_interp[,8:33], method="hellinger")
+diat.stand.hell <- vegan::decostand(master_v3_interp[,4:29], method="hellinger")
 #diatom distance matrix
 diat.dist <- dist(diat.stand.hell, method="euclidean")
 #normalize the diatom vectors to allow for comparison across proxies
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
-pig.stand.hell <- decostand(master_v3_interp[,34:45], method="hellinger")
+pig.stand.hell <- decostand(master_v3_interp[,30:41], method="hellinger")
 #pigment distance matrix
 pig.dist <- dist(pig.stand.hell, method="euclidean")
 pig.dist <- pig.dist/max(pig.dist)
 
-#standardize geochem
-# geochem.stand.hell <- decostand(master_v3_interp[,c(4:7)], method="hellinger")
-# #geochemment distance matrix
-# geochem.dist <- dist(geochem.stand.hell, method="euclidean")
-# geochem.dist <- geochem.dist/max(geochem.dist)
-
 #combine distance matrices
-comb.dist <- diat.dist+pig.dist#+geochem.dist
-#and scale
-comb.mds <- data.frame(cmdscale(d=comb.dist, k=2))
+comb.dist <- diat.dist+pig.dist
 
-plot(comb.mds)
+## Principal Coordinates Analysis
+pcoa_res <- cmdscale(comb.dist, k = 2, eig = TRUE)   # eig = TRUE for variance explained
+site_scores <- as.data.frame(pcoa_res$points)
+plot(site_scores)
 
-#get scores
-site.comb <- data.frame(scores(comb.mds))
+colnames(site_scores) <- c("PCoA1", "PCoA2")
 
-#add sample IDs
-site.comb$lake <- master_v3_interp$lake
-site.comb$year <- master_v3_interp$year_loess
+# add metadata
+site_scores$lake <- master_v3_interp$lake
+site_scores$year <- master_v3_interp$year_loess
 
-glimpse(site.comb)
-#diatom vectors
-diat.vec <- envfit(comb.mds,env=master_v3_interp[,8:33],na.rm=T)
-diat.vec <- data.frame(cbind(diat.vec$vectors$arrows, diat.vec$vectors$r, diat.vec$vectors$pvals))
-diat.vec.sig <- subset(diat.vec, diat.vec$V4 <= 0.05 & diat.vec$V3 >= 0.5) #only saves vectors that are significant (p<0.05) and are >50% correlated with ordination
-#pigment vectors
-pig.vec <- envfit(comb.mds,env=master_v3_interp[,34:45],na.rm=T)
-pig.vec <- data.frame(cbind(pig.vec$vectors$arrows, pig.vec$vectors$r, pig.vec$vectors$pvals))
-pig.vec.sig <- subset(pig.vec, pig.vec$V4 <= 0.05 & pig.vec$V3 >= 0.5)
-#just geochem vectors
-# geochem.vec <- envfit(comb.mds,env=master_v3_interp[,c(4:7)],na.rm=T)
-# geochem.vec <- data.frame(cbind(geochem.vec$vectors$arrows, geochem.vec$vectors$r, geochem.vec$vectors$pvals))
-# geochem.vec.sig <- subset(geochem.vec, geochem.vec$V4 <= 0.05 & geochem.vec$V3 >= 0.6)
+## Extract variable loadings
 
-#combine pigment and diatom vectors
-diat.vec.sig$var <- "diatom"
-pig.vec.sig$var <- "pigment"
-comb.vec.sig <- rbind(diat.vec.sig,pig.vec.sig)
+# Diatoms
+diat.vec <- envfit(pcoa_res$points, master_v3_interp[,4:29], na.rm = TRUE)
+diat.df <- data.frame(
+  diat.vec$vectors$arrows,
+  r2 = diat.vec$vectors$r,
+  p = diat.vec$vectors$pvals,
+  varname = colnames(master_v3_interp)[4:29],
+  type = "diatom"
+)
 
-# Scale arrows by r2 to show correlation strength
-comb.vec.sig.scaled <- comb.vec.sig %>%
-  mutate(X1 = (X1*V3)/1.5,
-         X2 = (X2*V3)/1.5)
-# geochem.vec.sig.scaled <- geochem.vec.sig %>%
-#   mutate(X1 = (X1*V3)/2,
-#          X2 = (X2*V3)/2)
+# Pigments
+pig.vec <- envfit(pcoa_res$points, master_v3_interp[,30:41], na.rm = TRUE)
+pig.df <- data.frame(
+  pig.vec$vectors$arrows,
+  r2 = pig.vec$vectors$r,
+  p = pig.vec$vectors$pvals,
+  varname = colnames(master_v3_interp)[30:41],
+  type = "pigment"
+)
+
+# Combine & apply significance filter
+vecs <- bind_rows(diat.df, pig.df) %>%
+  filter(p <= 0.05, r2 >= 0.5)
+
+# Scale arrows by r² to indicate correlation strength
+vecs_scaled <- vecs %>%
+  mutate(
+    Dim1 = Dim1 * r2,
+    Dim2 = Dim2 * r2
+  )
+#these are the loadings for each of the variables
 
 #plot PCoA paths for all lakes
-ggplot(aes(X1, X2),data=site.comb) +  
+ggplot(aes(PCoA1, PCoA2),data=site_scores) +  
   #lake trajectories 
   geom_path(aes(color=lake), size=0.75, 
             arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
             lineend="round") + 
   #vectors
-  geom_segment(data=comb.vec.sig.scaled,
-               aes(x=0,y=0,xend=X1,yend=X2), 
-               color="gray") + 
-  geom_point(data=comb.vec.sig.scaled,
-             aes(x=X1,y=X2,shape=var),color="gray",size=2)+
-  geom_text(data=comb.vec.sig.scaled,
-            aes(x=X1, y=X2),label=rownames(comb.vec.sig.scaled), size=4,
-            position=position_jitter(width=0.1,height=0.1))+
+  geom_segment(data = vecs_scaled,
+               aes(x = 0, y = 0, xend = Dim1, yend = Dim2),
+               color = "gray40") +
+  geom_point(data = vecs_scaled,
+             aes(x = Dim1, y = Dim2, fill = type),
+             size = 3, pch = 21) +
+  geom_text(data = vecs_scaled,
+            aes(x = Dim1, y = Dim2, label = varname),
+            size = 4,
+            nudge_x = 0.05, nudge_y = 0.05) +
   #general aesthetics
-  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
+  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake",fill="Variable type") +
   scale_x_continuous(limits=c(-0.75,0.75))+
   scale_y_continuous(limits=c(-0.75,0.75))+
   scale_color_manual(values=c("#C1D9B7", #burnt
@@ -184,7 +198,9 @@ ggplot(aes(X1, X2),data=site.comb) +
                               "#ebdcff", #smoke
                               "#ffd8c9" #wtwin
   )) +
+  scale_fill_manual(values=c("gold","darkgreen")) +
   theme_classic(base_size=14) 
+
 
 ## ---------------------------------------------------------------------------- ##
 ## --------------------- PCoA for each mixing regime -------------------------- ##
@@ -212,8 +228,8 @@ for (i in 1:length(mixing_regime)) {
   mix.master.dat <- subset(master_v3_interp,master_v3_interp$mix.regime==mixing_regime[i])
   
   #standardize diatoms and pigments... 
-  diat.stand.hell.mix <- decostand(mix.master.dat[,8:33], method="hellinger")
-  pig.stand.hell.mix <- decostand(mix.master.dat[,34:45], method="hellinger")
+  diat.stand.hell.mix <- decostand(mix.master.dat[,4:29], method="hellinger")
+  pig.stand.hell.mix <- decostand(mix.master.dat[,30:41], method="hellinger")
   #...to create distance matrices
   diat.dist.mix <- dist(diat.stand.hell.mix, method="euclidean")
   pig.dist.mix <- dist(pig.stand.hell.mix, method="euclidean")
@@ -235,13 +251,13 @@ for (i in 1:length(mixing_regime)) {
   
   #calculate vectors for diatoms and pigments
   #diatom vectors
-  diat.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,8:33],na.rm=T)
+  diat.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,4:29],na.rm=T)
   diat.vec.mix <- data.frame(cbind(diat.vec.mix$vectors$arrows, 
                                    diat.vec.mix$vectors$r, 
                                    diat.vec.mix$vectors$pvals),
                              var_type="diatoms")
   #pigments
-  pig.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,34:45],na.rm=T)
+  pig.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,30:41],na.rm=T)
   pig.vec.mix <- data.frame(cbind(pig.vec.mix$vectors$arrows, 
                                   pig.vec.mix$vectors$r, 
                                   pig.vec.mix$vectors$pvals),
@@ -326,8 +342,8 @@ for (i in 1:length(lakes)) {
   lake.master.dat <- subset(master_v3_interp,master_v3_interp$lake==lakes[i])
   
   #standardize diatoms and pigments... 
-  diat.stand.hell.lake <- decostand(lake.master.dat[,8:33], method="hellinger")
-  pig.stand.hell.lake <- decostand(lake.master.dat[,34:45], method="hellinger")
+  diat.stand.hell.lake <- decostand(lake.master.dat[,4:29], method="hellinger")
+  pig.stand.hell.lake <- decostand(lake.master.dat[,30:41], method="hellinger")
   #...to create distance matrices
   diat.dist.lake <- dist(diat.stand.hell.lake, method="euclidean")
   pig.dist.lake <- dist(pig.stand.hell.lake, method="euclidean")
@@ -348,13 +364,13 @@ for (i in 1:length(lakes)) {
   
   #calculate vectors for diatoms and pigments
   #diatom vectors
-  diat.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,8:33],na.rm=T)
+  diat.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,4:29],na.rm=T)
   diat.vec.lake <- data.frame(cbind(diat.vec.lake$vectors$arrows, 
                                    diat.vec.lake$vectors$r, 
                                    diat.vec.lake$vectors$pvals),
                              var_type="diatoms")
   #pigments
-  pig.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,34:45],na.rm=T)
+  pig.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,30:41],na.rm=T)
   pig.vec.lake <- data.frame(cbind(pig.vec.lake$vectors$arrows, 
                                   pig.vec.lake$vectors$r, 
                                   pig.vec.lake$vectors$pvals),
