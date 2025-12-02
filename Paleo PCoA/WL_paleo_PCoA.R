@@ -307,32 +307,40 @@ for (i in 1:length(mixing_regime)) {
                                                                   lake=="wtwin" ~ "#ffd8c9")) 
 
   p <- 
-  ggplot(aes(Dim1, Dim2),data=comb.scores.mix) +  
-    #lake trajectories 
-    geom_path(aes(color=lake), size=0.75, 
-              arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
-    #pigment vectors
-    geom_segment(data=pig.vec.mix.sig.scaled,
-                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
-                 color="darkgreen",arrow=arrow(length=unit(0.15, "inches"))) + 
-    geom_text(data=pig.vec.mix.sig.scaled,
-              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(pig.vec.mix.sig.scaled), 
-              color="darkgreen", size=4,vjust=-0.5,
-              position=position_jitter(width=0.1,height=0.1)) +  
-    #diatom vectors
-    geom_segment(data=diat.vec.mix.sig.scaled,
-                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
-                 color="orange",arrow=arrow(length=unit(0.15, "inches"))) + 
-    geom_text(data=diat.vec.mix.sig.scaled,
-              aes(x=Dim1*1.2, y=Dim2*1.2),label=rownames(diat.vec.mix.sig.scaled), 
-              color="orange", size=4,vjust=-0.5,
-              position=position_jitter(width=0.1,height=0.1)) +
-    #general aesthetics
-    labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake") +
-    ggtitle(mixing_regime[i]) +
-    scale_color_manual(values=unique(comb.scores.mix$color)) +
-    theme_bw(base_size=14) +
-    theme(legend.position="bottom")
+ggplot(aes(PCoA1, PCoA2)) +  
+  #lake trajectories 
+  geom_path(aes(color=lake), size=0.75, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
+            lineend="round") + 
+  #vectors
+  geom_segment(data = vecs_scaled,
+               aes(x = 0, y = 0, xend = Dim1, yend = Dim2),
+               color = "gray40") +
+  geom_point(data = vecs_scaled,
+             aes(x = Dim1, y = Dim2, fill = type),
+             size = 3, pch = 21) +
+  geom_text(data = vecs_scaled,
+            aes(x = Dim1, y = Dim2, label = varname),
+            size = 4,
+            nudge_x = 0.05, nudge_y = 0.05) +
+  #general aesthetics
+  labs(x = paste0("PCoA Axis 1 (",round(var_explained[1]*100,1),"%)"), 
+       y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)"), 
+       color = "Lake",fill="Variable type") +
+  scale_x_continuous(limits=c(-0.75,0.75))+
+  scale_y_continuous(limits=c(-0.75,0.75))+
+  scale_color_manual(values=c("#ffa600", #Dunnigan
+                              "#fbddbe", #Finger
+                              "#336d38", #Burnt
+                              "#659566", #Smoke
+                              "#98bf97", #Elbow
+                              "#ccebcb", #East Twin
+                              "#c285ff", #Flame
+                              "#e5c6ff" #West Twin
+                              
+  )) +
+  scale_fill_manual(values=c("#ffd802","#86a72c")) +
+  theme_classic(base_size=14) 
 
   pcoa.plots[[i]] <- p
 }
@@ -355,7 +363,7 @@ pcoa.variable.vectors.lake <- list() #list to save variable vectors
 pcoa.plots.lake <- list() #list to save PCoA plots
 
 for (i in 1:length(lakes)) {
-  #create df for each mixing regime
+  #create df for each lake
   lake.master.dat <- subset(master_v3_interp,master_v3_interp$lake==lakes[i])
   
   #standardize diatoms and pigments... 
@@ -364,14 +372,23 @@ for (i in 1:length(lakes)) {
   #...to create distance matrices
   diat.dist.lake <- dist(diat.stand.hell.lake, method="euclidean")
   pig.dist.lake <- dist(pig.stand.hell.lake, method="euclidean")
+  #normalize
+  diat.dist.lake <- diat.dist.lake/max(diat.dist.lake)
+  pig.dist.lake <- pig.dist.lake/max(pig.dist.lake)
   
   #combine distance matrices...
   comb.dist.lake <- diat.dist.lake+pig.dist.lake
-  #...and scale
-  comb.mds.lake <- cmdscale(d=comb.dist.lake, k=2)
+  
+  #PCoA
+  comb.mds.lake <- cmdscale(d=comb.dist.lake, k=2, eig=TRUE)
+  ## extract variance explained by PCoA axis 1 and 2
+  #get eigenvalues
+  eig_vals <- comb.mds.lake$eig
+  # Calculate percent variance explained
+  var_explained <- eig_vals / sum(eig_vals)
   
   #get scores
-  comb.scores.lake <- data.frame(scores(comb.mds.lake))
+  comb.scores.lake <- data.frame(comb.mds.lake$points)
   #add sample IDs
   comb.scores.lake$lake <- lake.master.dat$lake
   comb.scores.lake$year <- lake.master.dat$year_loess
@@ -380,64 +397,70 @@ for (i in 1:length(lakes)) {
   pcoa.scores_lake[[i]] <- comb.scores.lake
   
   #calculate vectors for diatoms and pigments
-  #diatom vectors
-  diat.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,4:29],na.rm=T)
-  diat.vec.lake <- data.frame(cbind(diat.vec.lake$vectors$arrows, 
-                                   diat.vec.lake$vectors$r, 
-                                   diat.vec.lake$vectors$pvals),
-                             var_type="diatoms")
-  #pigments
-  pig.vec.lake <- envfit(comb.mds.lake,env=lake.master.dat[,30:41],na.rm=T)
-  pig.vec.lake <- data.frame(cbind(pig.vec.lake$vectors$arrows, 
-                                  pig.vec.lake$vectors$r, 
-                                  pig.vec.lake$vectors$pvals),
-                            var_type="pigment")
+  # Diatoms
+  diat.vec <- envfit(comb.mds.lake$points, lake.master.dat[,4:29], na.rm = TRUE)
+  diat.vec.lake <- data.frame(
+    diat.vec$vectors$arrows,
+    r2 = diat.vec$vectors$r,
+    p = diat.vec$vectors$pvals,
+    varname = colnames(master_v3_interp)[4:29],
+    type = "diatom"
+  )
+  
+  # Pigments
+  pig.vec <- envfit(comb.mds.lake$points, lake.master.dat[,30:41], na.rm = TRUE)
+  pig.vec.lake <- data.frame(
+    pig.vec$vectors$arrows,
+    r2 = pig.vec$vectors$r,
+    p = pig.vec$vectors$pvals,
+    varname = colnames(master_v3_interp)[30:41],
+    type = "pigment"
+  )
   
   #keep only significant vectors for plotting
-  diat.vec.lake.sig <- subset(diat.vec.lake, diat.vec.lake$V4 <= 0.05 & diat.vec.lake$V3 >= 0.5)
-  pig.vec.lake.sig <- subset(pig.vec.lake, pig.vec.lake$V4 <= 0.05 & pig.vec.lake$V3 >= 0.5)
+  vec.lake <- rbind(diat.vec.lake,pig.vec.lake) %>% 
+    filter(p <= 0.05, r2 >= 0.5) %>%
+    mutate(lake=lakes[i]) 
   
   #save these to list
-  vec.lake <- rbind(diat.vec.lake.sig,pig.vec.lake.sig) %>% mutate(lake=lakes[i])
+  
   pcoa.variable.vectors.lake[[i]] <- vec.lake
   
-  # Scale arrows by r2 to show correlation strength
-  diat.vec.lake.sig.scaled <- diat.vec.lake.sig %>%
-    mutate(Dim1 = (Dim1*V3)/2,
-           Dim2 = (Dim2*V3)/2)
-  pig.vec.lake.sig.scaled <- pig.vec.lake.sig %>%
-    mutate(Dim1 = (Dim1*V3)/2,
-           Dim2 = (Dim2*V3)/2)
+  # Scale arrows by r² to indicate correlation strength
+  vecs_scaled <- vec.lake %>%
+    mutate(
+      Dim1 = Dim1 * r2,
+      Dim2 = Dim2 * r2
+    )
+  #these are the loadings for each of the variables
   
   #create PCoA biplot
-
   p <- 
-    ggplot(aes(Dim1, Dim2),data=comb.scores.lake) +  
+    ggplot(aes(X1, X2), data=comb.scores.lake) +  
     #lake trajectories 
-    geom_path(color="black", size=0.75, 
-              arrow=arrow(type="closed", ends="first",length=unit(0.05,"inches")), lineend="round") + 
-    #pigment vectors
-    geom_segment(data=pig.vec.lake.sig.scaled,
-                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
-                 color="darkgreen") + 
-    geom_text(data=pig.vec.lake.sig.scaled,
-              aes(x=Dim1, y=Dim2),label=rownames(pig.vec.lake.sig.scaled), 
-              color="darkgreen", size=3,vjust=-0.5,
-              position=position_jitter(width=0.1,height=0.1)) +  
-    #diatom vectors
-    geom_segment(data=diat.vec.lake.sig.scaled,
-                 aes(x=0,y=0,xend=Dim1,yend=Dim2), 
-                 color="orange") + 
-    geom_text(data=diat.vec.lake.sig.scaled,
-              aes(x=Dim1, y=Dim2),label=rownames(diat.vec.lake.sig.scaled), 
-              color="orange", size=3,vjust=-0.5,
-              position=position_jitter(width=0.1,height=0.1)) +
+    geom_path(size=0.75, 
+              arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
+              lineend="round") + 
+    #vectors
+    geom_segment(data = vecs_scaled,
+                 aes(x = 0, y = 0, xend = Dim1, yend = Dim2),
+                 color = "gray40") +
+    geom_point(data = vecs_scaled,
+               aes(x = Dim1, y = Dim2, fill = type),
+               size = 3, pch = 21) +
+    geom_text(data = vecs_scaled,
+              aes(x = Dim1, y = Dim2, label = varname),
+              size = 4,
+              nudge_x = 0.05, nudge_y = 0.05) +
     #general aesthetics
+    labs(x = paste0("PCoA Axis 1 (",round(var_explained[1]*100,1),"%)"), 
+         y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)"), 
+         fill="Variable type") +
     ggtitle(lake_plot_titles[i]) +
-    theme_classic()+
-    theme(axis.title=element_blank(),
-          title=element_text(size=11),
-          axis.text=element_text(size=10))
+    #scale_x_continuous(limits=c(-0.75,0.75))+
+    #scale_y_continuous(limits=c(-0.75,0.75))+
+    scale_fill_manual(values=c("#ffd802","#86a72c")) +
+    theme_classic(base_size=14) 
   
   pcoa.plots[[i]] <- p
 }
