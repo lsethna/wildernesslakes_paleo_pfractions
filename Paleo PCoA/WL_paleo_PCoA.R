@@ -125,6 +125,13 @@ comb.dist <- diat.dist+pig.dist
 
 ## Principal Coordinates Analysis
 pcoa_res <- cmdscale(comb.dist, k = 2, eig = TRUE)   # eig = TRUE for variance explained
+## extract variance explained by PCoA axis 1 and 2
+#get eigenvalues
+eig_vals <- pcoa_res$eig
+# Calculate percent variance explained
+var_explained <- eig_vals / sum(eig_vals)
+
+
 site_scores <- as.data.frame(pcoa_res$points)
 plot(site_scores)
 
@@ -169,7 +176,14 @@ vecs_scaled <- vecs %>%
 #these are the loadings for each of the variables
 
 #plot PCoA paths for all lakes
-ggplot(aes(PCoA1, PCoA2),data=site_scores) +  
+glimpse(site_scores)
+
+site_scores %>%
+  #change lake names and order
+  mutate(lake = factor(lake,levels=c("dunnigan","finger","burnt","smoke","elbow","etwin","flame","wtwin"),
+                       labels=c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin"))
+         ) %>%
+ggplot(aes(PCoA1, PCoA2)) +  
   #lake trajectories 
   geom_path(aes(color=lake), size=0.75, 
             arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
@@ -186,19 +200,22 @@ ggplot(aes(PCoA1, PCoA2),data=site_scores) +
             size = 4,
             nudge_x = 0.05, nudge_y = 0.05) +
   #general aesthetics
-  labs(x = "PCoA Axis 1", y = "PCoA Axis 2", color = "Lake",fill="Variable type") +
+  labs(x = paste0("PCoA Axis 1 (",round(var_explained[1]*100,1),"%)"), 
+       y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)"), 
+       color = "Lake",fill="Variable type") +
   scale_x_continuous(limits=c(-0.75,0.75))+
   scale_y_continuous(limits=c(-0.75,0.75))+
-  scale_color_manual(values=c("#C1D9B7", #burnt
-                              "#89CFF0", #dunnigan
-                              "#007CAA", #elbow
-                              "#665191", #etwin
-                              "#d45087", #finger
-                              "#7A871E", #flame
-                              "#ebdcff", #smoke
-                              "#ffd8c9" #wtwin
+  scale_color_manual(values=c("#ffa600", #Dunnigan
+                              "#fbddbe", #Finger
+                              "#336d38", #Burnt
+                              "#659566", #Smoke
+                              "#98bf97", #Elbow
+                              "#ccebcb", #East Twin
+                              "#c285ff", #Flame
+                              "#e5c6ff" #West Twin
+                              
   )) +
-  scale_fill_manual(values=c("gold","darkgreen")) +
+  scale_fill_manual(values=c("#ffd802","#86a72c")) +
   theme_classic(base_size=14) 
 
 
