@@ -1,4 +1,4 @@
-librarian::shelf(tidyverse,grid,vegan,cowplot,zoo)
+librarian::shelf(tidyverse,grid,vegan,cowplot,zoo,ggrepel)
 
 rm(list=ls())
 
@@ -356,7 +356,8 @@ unique(master_v3_interp$lake)
 #put in order for plotting
 lakes = c("dunnigan","finger","burnt","smoke","elbow","etwin","flame","wtwin")
 #make list of plot titles
-lake_plot_titles <- c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin")
+lake_plot_titles <- c("(a) Dunnigan"," (b) Finger","(c) Burnt","(d) Smoke",
+                      "(e) Elbow","(f) East Twin","(g) Flame","(h) West Twin")
 
 pcoa.scores_lake <- list() #list to save scores output
 pcoa.variable.vectors.lake <- list() #list to save variable vectors
@@ -448,32 +449,33 @@ for (i in 1:length(lakes)) {
     geom_point(data = vecs_scaled,
                aes(x = Dim1, y = Dim2, fill = type),
                size = 3, pch = 21) +
-    geom_text(data = vecs_scaled,
+    geom_text_repel(data = vecs_scaled,
               aes(x = Dim1, y = Dim2, label = varname),
-              size = 4,
-              nudge_x = 0.05, nudge_y = 0.05) +
+              size =3,
+              direction="both") +
     #general aesthetics
     labs(x = paste0("PCoA Axis 1 (",round(var_explained[1]*100,1),"%)"), 
          y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)"), 
          fill="Variable type") +
     ggtitle(lake_plot_titles[i]) +
-    #scale_x_continuous(limits=c(-0.75,0.75))+
-    #scale_y_continuous(limits=c(-0.75,0.75))+
+    #normalize axes to allow for comparisons between lakes
+    scale_x_continuous(limits=c(-1.3,1.1))+
+    scale_y_continuous(limits=c(-1.1,1.05))+
     scale_fill_manual(values=c("#ffd802","#86a72c")) +
-    theme_classic(base_size=14) 
+    theme_classic(base_size=14)+
+    theme(legend.position="none")
   
-  pcoa.plots[[i]] <- p
+  pcoa.plots.lake[[i]] <- p
 }
 
-cowplot::plot_grid(plotlist=pcoa.plots,ncol=2,
-                   labels=c("(a)","(b)","(c)","(d)","(e)","(f)","(g)","(h)"),
+cowplot::plot_grid(plotlist=pcoa.plots.lake,ncol=2,
                    label_fontface="plain")
 
 #move rownames (important variables) to a column
 pcoa.variable.vectors.lake <- lapply(pcoa.variable.vectors.lake,tibble::rownames_to_column, var="var")
-pcoa.sig.variables.lake <- do.call(rbind,lapply(pcoa.variable.vectors.lake,as.data.frame))
-unique(pcoa.sig.variables.lake$lake)
-write.csv(pcoa.sig.variables.lake,file="sig_variables_pcoa_by_lake.csv")
+pcoa.variable.vectors.lake <- do.call(rbind,lapply(pcoa.variable.vectors.lake,as.data.frame))
+unique(pcoa.variable.vectors.lake$lake)
+write.csv(pcoa.variable.vectors.lake,file="Paleo PCoA/sig_variables_pcoa_by_lake.csv")
 
 ## plot up PCoA loadings over time for each lake
 pcoa.scores_lake_df <- dplyr::bind_rows(pcoa.scores_lake)
