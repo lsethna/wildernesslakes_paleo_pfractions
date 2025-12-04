@@ -191,11 +191,11 @@ ggplot(aes(PCoA1, PCoA2)) +
   #vectors
   geom_segment(data = vecs_scaled,
                aes(x = 0, y = 0, xend = Dim1, yend = Dim2),
-               color = "gray40") +
+               color = "#7b7b7b",size=0.5) +
   geom_point(data = vecs_scaled,
              aes(x = Dim1, y = Dim2, fill = type),
              size = 3, pch = 21) +
-  geom_text(data = vecs_scaled,
+  geom_text_repel(data = vecs_scaled,
             aes(x = Dim1, y = Dim2, label = varname),
             size = 4,
             nudge_x = 0.05, nudge_y = 0.05) +
@@ -207,16 +207,37 @@ ggplot(aes(PCoA1, PCoA2)) +
   scale_y_continuous(limits=c(-0.75,0.75))+
   scale_color_manual(values=c("#ffa600", #Dunnigan
                               "#fbddbe", #Finger
-                              "#336d38", #Burnt
-                              "#659566", #Smoke
-                              "#98bf97", #Elbow
-                              "#ccebcb", #East Twin
+                              "#52d4b2", #Burnt
+                              "#81dec3", #Smoke
+                              "#a8e8d3", #Elbow
+                              "#baeddc", #East Twin
                               "#c285ff", #Flame
                               "#e5c6ff" #West Twin
                               
   )) +
-  scale_fill_manual(values=c("#ffd802","#86a72c")) +
+  scale_fill_manual(values=c("#b69d05","#86a72c")) +
   theme_classic(base_size=14) 
+
+#plot change in scores over time
+site_scores %>%
+  #change lake names and order
+  mutate(lake = factor(lake,levels=c("dunnigan","finger","burnt","smoke","elbow","etwin","flame","wtwin"),
+                       labels=c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin"))
+  ) %>%
+  ggplot(aes(x=year,y=PCoA1)) +  
+  #lake trajectories 
+  geom_path(aes(color=lake), size=0.75, 
+            arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
+            lineend="round") +
+  scale_color_manual(values=c("#ffa600", #Dunnigan
+                             "#fbddbe", #Finger
+                             "#52d4b2", #Burnt
+                             "#81dec3", #Smoke
+                             "#a8e8d3", #Elbow
+                             "#baeddc", #East Twin
+                             "#c285ff", #Flame
+                             "#e5c6ff" #West Twin
+  ))
 
 
 ## ---------------------------------------------------------------------------- ##
@@ -480,22 +501,25 @@ write.csv(pcoa.variable.vectors.lake,file="Paleo PCoA/sig_variables_pcoa_by_lake
 ## plot up PCoA loadings over time for each lake
 pcoa.scores_lake_df <- dplyr::bind_rows(pcoa.scores_lake)
 glimpse(pcoa.scores_lake_df)
-
-#round year values to nearest 5, take average?
-round_to_nearest_10 <- function(x) {
-  10 * round(x / 10)
-}
-#test
-round_to_nearest_10(1986)
+write.csv(pcoa.scores_lake_df,file="PCoA_scores_by_lake.csv")
 
 pcoa.scores_lake_df %>%
-  mutate(year_round = round_to_nearest_10(year)) %>% 
-  group_by(lake,year_round) %>%
-  summarize(Dim1 = median(Dim1)) %>%
-ggplot(aes(x=year_round,y=Dim1,color=lake))+
-  geom_vline(xintercept = 1900,lty="dashed")+
-  geom_vline(xintercept = 1970,lty="dashed")+
-  #geom_point()+
-  geom_smooth(se=F)+
-  #geom_line(size=1)+
-  theme_classic()
+#change lake names and order
+mutate(lake = factor(lake,levels=c("dunnigan","finger","burnt","smoke","elbow","etwin","flame","wtwin"),
+                     labels=c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin"))
+) %>%
+ggplot(aes(x=year,y=X1,color=lake))+
+  #geom_vline(xintercept = 1900,lty="dashed")+
+  #geom_vline(xintercept = 1970,lty="dashed")+
+  geom_smooth(se=F,span=0.3)+ #span - smaller numbers produce wigglier lines, larger numbers produce smoother lines
+  scale_color_manual(values=c("#ffa600", #Dunnigan
+                              "#fbddbe", #Finger
+                              "#52d4b2", #Burnt
+                              "#81dec3", #Smoke
+                              "#a8e8d3", #Elbow
+                              "#baeddc", #East Twin
+                              "#c285ff", #Flame
+                              "#e5c6ff" #West Twin
+  )) +
+  labs(x="Year",y="PCoA Axis 1",color="Lake") +
+  theme_classic(base_size=14)
