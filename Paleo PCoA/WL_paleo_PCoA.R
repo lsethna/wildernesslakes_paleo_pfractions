@@ -10,7 +10,7 @@ master_dat <- read.csv("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pf
 glimpse(master_dat)
 
 ## ------------------------------------------------------------ ##
-## ---- filter variables: pigments>0, diatoms>2% abundance ---- ##
+## ---- filter variables: pigments>0, diatoms>5% abundance ---- ##
 ## ------------------------------------------------------------ ##
 vars <- data.frame(
   column_n=1:length(master_dat),
@@ -45,18 +45,20 @@ glimpse(master_v2)
 ## ---- interpolate variables ---- ##
 ## ------------------------------- ##
 master_v3_interp <- master_v2 %>%
+  #remove rows where all diatom and pigment data are NA
+  filter(!if_all(ast_formosa:b_car, is.na)) %>%
   group_by(lake) %>%
   #will replace NA values with interpolated values - done at every dated interval 
   mutate_at(vars(ast_formosa:b_car),funs(zoo::na.approx(.,method="constant",rule=2))) %>% #rule=2 means extend nearest values to leading/trailing NAs
   ungroup() %>%
   drop_na() #remove any NA values - beyond dated intervals
 
-#quick check to make sure all dates and dates are included
+#quick check to make sure all dates are included
 ggplot(master_v3_interp,aes(x=year_loess,y=depth))+
-  geom_line()+facet_wrap(~lake)
+  geom_point()+facet_wrap(~lake)
 
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions")
-write.csv(master_v3_interp,file="raw_data/interpolated_diatom_pigment_dat_1Dec25.csv")
+setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions")
+write.csv(master_v3_interp,file="raw_data/interpolated_diatom_pigment_dat_8July2026.csv")
 
 colnames(master_v3_interp)
 #diatoms=4:29
