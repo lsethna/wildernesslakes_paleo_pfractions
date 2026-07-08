@@ -2,10 +2,10 @@ librarian::shelf(tidyverse,grid,vegan,cowplot,zoo,ggrepel)
 
 rm(list=ls())
 
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/Paleo PCoA")
+setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions/Paleo PCoA")
 
 #read in master data
-master_dat <- read.csv("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv") %>%
+master_dat <- read.csv("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv") %>%
   select(!X)
 glimpse(master_dat)
 

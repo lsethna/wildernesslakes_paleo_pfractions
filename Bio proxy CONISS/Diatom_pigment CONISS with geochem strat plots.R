@@ -7,7 +7,7 @@ rm(list=ls())
 librarian::shelf(tidyverse, readxl,rioja,vegan)
 
 getwd()
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
+setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
 
 ## ----------------------------------- ##
 # Read in data ----

@@ -7,7 +7,7 @@ rm(list=ls())
 librarian::shelf(tidyverse, googledrive,readxl)
 
 getwd()
-setwd("C:/Users/lsethna_smm/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
+setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions/Master dataset") #change this to match local GitHub folder
 
 ## ----------------------------------- ##
 # Download data ----
@@ -56,7 +56,7 @@ bsi <- read_excel("raw_data/WL_BSi_all.xlsx")
 dates_dmar <- read.csv("raw_data/sections_interp_year_dmar_30July2024.csv")
 loi <- read_excel("raw_data/WL_LOI_allcores.xlsx") %>% janitor::clean_names()
 pfracs <- read_excel("raw_data/Pfrac_mass_focuscorrect.xlsx")
-pigments <- read.csv("raw_data/WL_allpigments_20Nov24.csv")
+pigments <- read.csv("raw_data/WL_pigments_allcores.csv")
 diatoms <- read.csv("raw_data/wilddiatom_rawdat.csv")
 isotopes <- read_excel("raw_data/WL_isotopes_rawdat.xlsx")
 
