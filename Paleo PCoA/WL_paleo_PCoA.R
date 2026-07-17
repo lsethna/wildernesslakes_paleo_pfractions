@@ -4,6 +4,9 @@ rm(list=ls())
 
 setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions/Paleo PCoA")
 
+#create date stamp for file exports
+date <- format(Sys.Date(),format="%d%b%y")
+
 #read in master data
 master_dat <- read.csv("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions/raw_data/WL_paleo_masterdataset_20Nov2024.csv") %>%
   select(!X)
@@ -26,8 +29,10 @@ sel_diat <- master_dat %>% select(colnames(master_dat[,c(56:269)])) %>%
 sel_p <- master_dat %>% select(colnames(master_dat[,24:55])) %>% 
   summarize(across(chlide_a:car_z,max,na.rm=T))
 sel_pig <- sel_p %>% 
-  select(!c("sudan","chl_c1","chl_c2","fuco","diadino","chl_b","chl_a","chl_ap")) %>% #remove unstable or non-interpretable pigments
-  pivot_longer(cols=chlide_a:car_z) %>% filter(value>0) #remove any non-detect pigments
+  select(!c("sudan","chl_c1","chl_c2","fuco","diadino","chl_b","chl_a","chl_ap",contains("sed"))) %>% #remove unstable or non-interpretable pigments
+  pivot_longer(cols=chlide_a:car_z) %>% 
+  filter(value>0) #remove any non-detect pigments
+sel_pig
 
 #filter master data based on selected diatoms and pigments
 master_v2 <- master_dat %>% select(lake,year_loess,depth, #id info
@@ -58,13 +63,13 @@ ggplot(master_v3_interp,aes(x=year_loess,y=depth))+
   geom_point()+facet_wrap(~lake)
 
 setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions")
-write.csv(master_v3_interp,file="raw_data/interpolated_diatom_pigment_dat_8July2026.csv")
+write.csv(master_v3_interp,file=paste0("raw_data/interpolated_diatom_pigment_dat_",date,".csv"))
 
 colnames(master_v3_interp)
 #diatoms=4:29
-#pigments=30:41
+#pigments=30:38
 
-diat_pig_vars <- colnames(master_v3_interp)[4:41]
+diat_pig_vars <- colnames(master_v3_interp)[4:38]
 
 ## ------------------------------------------------------- ##
 ## ---- create new variable names for pretty plotting ---- ##
@@ -105,7 +110,7 @@ master_v3_interp <- master_v3_interp %>%
 #check column names and numbers
 colnames(master_v3_interp)
 #diatoms 4:29
-#pigments 30:41
+#pigments 30:38
 
 ## Calculate distance matrices
 
@@ -117,7 +122,7 @@ diat.dist <- dist(diat.stand.hell, method="euclidean")
 diat.dist <- diat.dist/max(diat.dist)
 
 #standardize pigments
-pig.stand.hell <- decostand(master_v3_interp[,30:41], method="hellinger")
+pig.stand.hell <- decostand(master_v3_interp[,30:38], method="hellinger")
 #pigment distance matrix
 pig.dist <- dist(pig.stand.hell, method="euclidean")
 pig.dist <- pig.dist/max(pig.dist)
@@ -156,12 +161,12 @@ diat.df <- data.frame(
 )
 
 # Pigments
-pig.vec <- envfit(pcoa_res$points, master_v3_interp[,30:41], na.rm = TRUE)
+pig.vec <- envfit(pcoa_res$points, master_v3_interp[,30:38], na.rm = TRUE)
 pig.df <- data.frame(
   pig.vec$vectors$arrows,
   r2 = pig.vec$vectors$r,
   p = pig.vec$vectors$pvals,
-  varname = colnames(master_v3_interp)[30:41],
+  varname = colnames(master_v3_interp)[30:38],
   type = "pigment"
 )
 
@@ -175,10 +180,17 @@ vecs_scaled <- vecs %>%
     Dim1 = Dim1 * r2,
     Dim2 = Dim2 * r2
   )
+
+write.csv(vecs_scaled,file=paste0("Paleo PCoA/all_lakes_PCoA_vec_loadings_",date,".csv"))
 #these are the loadings for each of the variables
 
 #plot PCoA paths for all lakes
 glimpse(site_scores)
+
+pdf(
+  file=paste0("Paleo PCoA/plots/PCoA_diatoms_pigments_",date,".pdf"),
+  width=6.5,height=5
+)
 
 site_scores %>%
   #change lake names and order
@@ -205,8 +217,8 @@ ggplot(aes(PCoA1, PCoA2)) +
   labs(x = paste0("PCoA Axis 1 (",round(var_explained[1]*100,1),"%)"), 
        y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)"), 
        color = "Lake",fill="Variable type") +
-  scale_x_continuous(limits=c(-0.75,0.75))+
-  scale_y_continuous(limits=c(-0.75,0.75))+
+  # scale_x_continuous(limits=c(-0.75,0.75))+
+  # scale_y_continuous(limits=c(-0.75,0.75))+
   scale_color_manual(values=c("#ffa600", #Dunnigan
                               "#fbddbe", #Finger
                               "#52d4b2", #Burnt
@@ -217,8 +229,10 @@ ggplot(aes(PCoA1, PCoA2)) +
                               "#e5c6ff" #West Twin
                               
   )) +
-  scale_fill_manual(values=c("#b69d05","#86a72c")) +
+  scale_fill_manual(values=c("#b39dd0","#96c068")) +
   theme_classic(base_size=14) 
+
+dev.off()
 
 #plot change in scores over time
 site_scores %>%
@@ -269,7 +283,7 @@ for (i in 1:length(mixing_regime)) {
   
   #standardize diatoms and pigments... 
   diat.stand.hell.mix <- decostand(mix.master.dat[,4:29], method="hellinger")
-  pig.stand.hell.mix <- decostand(mix.master.dat[,30:41], method="hellinger")
+  pig.stand.hell.mix <- decostand(mix.master.dat[,30:38], method="hellinger")
   #...to create distance matrices
   diat.dist.mix <- dist(diat.stand.hell.mix, method="euclidean")
   pig.dist.mix <- dist(pig.stand.hell.mix, method="euclidean")
@@ -297,7 +311,7 @@ for (i in 1:length(mixing_regime)) {
                                    diat.vec.mix$vectors$pvals),
                              var_type="diatoms")
   #pigments
-  pig.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,30:41],na.rm=T)
+  pig.vec.mix <- envfit(comb.mds.mix,env=mix.master.dat[,30:38],na.rm=T)
   pig.vec.mix <- data.frame(cbind(pig.vec.mix$vectors$arrows, 
                                   pig.vec.mix$vectors$r, 
                                   pig.vec.mix$vectors$pvals),
@@ -392,7 +406,7 @@ for (i in 1:length(lakes)) {
   
   #standardize diatoms and pigments... 
   diat.stand.hell.lake <- decostand(lake.master.dat[,4:29], method="hellinger")
-  pig.stand.hell.lake <- decostand(lake.master.dat[,30:41], method="hellinger")
+  pig.stand.hell.lake <- decostand(lake.master.dat[,30:38], method="hellinger")
   #...to create distance matrices
   diat.dist.lake <- dist(diat.stand.hell.lake, method="euclidean")
   pig.dist.lake <- dist(pig.stand.hell.lake, method="euclidean")
@@ -432,12 +446,12 @@ for (i in 1:length(lakes)) {
   )
   
   # Pigments
-  pig.vec <- envfit(comb.mds.lake$points, lake.master.dat[,30:41], na.rm = TRUE)
+  pig.vec <- envfit(comb.mds.lake$points, lake.master.dat[,30:38], na.rm = TRUE)
   pig.vec.lake <- data.frame(
     pig.vec$vectors$arrows,
     r2 = pig.vec$vectors$r,
     p = pig.vec$vectors$pvals,
-    varname = colnames(master_v3_interp)[30:41],
+    varname = colnames(master_v3_interp)[30:38],
     type = "pigment"
   )
   
@@ -482,28 +496,35 @@ for (i in 1:length(lakes)) {
          fill="Variable type") +
     ggtitle(lake_plot_titles[i]) +
     #normalize axes to allow for comparisons between lakes
-    scale_x_continuous(limits=c(-1.3,1.1))+
-    scale_y_continuous(limits=c(-1.1,1.05))+
-    scale_fill_manual(values=c("#ffd802","#86a72c")) +
+    scale_x_continuous(limits=c(-1,1))+
+    scale_y_continuous(limits=c(-1,1))+
+    scale_fill_manual(values=c("#b39dd0","#96c068")) +
     theme_classic(base_size=14)+
     theme(legend.position="none")
   
   pcoa.plots.lake[[i]] <- p
 }
 
+pdf(
+  file=paste0("Paleo PCoA/plots/by_lake_PCoA_diatoms_pigments_",date,".pdf"),
+  width=8.5,height=11
+)
+
 cowplot::plot_grid(plotlist=pcoa.plots.lake,ncol=2,
                    label_fontface="plain")
+
+dev.off()
 
 #move rownames (important variables) to a column
 pcoa.variable.vectors.lake <- lapply(pcoa.variable.vectors.lake,tibble::rownames_to_column, var="var")
 pcoa.variable.vectors.lake <- do.call(rbind,lapply(pcoa.variable.vectors.lake,as.data.frame))
 unique(pcoa.variable.vectors.lake$lake)
-write.csv(pcoa.variable.vectors.lake,file="Paleo PCoA/sig_variables_pcoa_by_lake.csv")
+write.csv(pcoa.variable.vectors.lake,file=paste0("Paleo PCoA/sig_variables_pcoa_by_lake_",date,".csv"))
 
 ## plot up PCoA loadings over time for each lake
 pcoa.scores_lake_df <- dplyr::bind_rows(pcoa.scores_lake)
 glimpse(pcoa.scores_lake_df)
-write.csv(pcoa.scores_lake_df,file="PCoA_scores_by_lake.csv")
+#write.csv(pcoa.scores_lake_df,file="PCoA_scores_by_lake.csv")
 
 pcoa.scores_lake_df %>%
 #change lake names and order

@@ -13,7 +13,7 @@ setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions") #chang
 # Read in data ----
 ## ----------------------------------- ##
 #interpolated master data -- only diatoms and pigments
-master_dat <- read.csv("raw_data/interpolated_diatom_pigment_dat_8July2026.csv") %>% select(!X)
+master_dat <- read.csv("raw_data/interpolated_diatom_pigment_dat_17July2026.csv") %>% select(!X)
 glimpse(master_dat)
 #Organic C variable; keep only lake, date,and org_C variables
 org_c <- read.csv("raw_data/deriv_orgC.csv") %>% select(lake,year_loess,orgC_burial_g_cm2_yr,deriv_orgC)
@@ -28,7 +28,7 @@ master_dat_v2 <- master_dat %>% left_join(org_c) %>% left_join(pfrac)
 glimpse(master_dat_v2)
 
 ## get variables from PCoA
-imp_variables <- read.csv("Paleo PCoA/PCoA_var_loadings_by_lake.csv")
+imp_variables <- read.csv("Paleo PCoA/sig_variables_pcoa_by_lake_17Jul26.csv")
 glimpse(imp_variables)
 
 #get codes to change imp_variables back to match var names in master data
@@ -37,7 +37,7 @@ glimpse(variable_code)
 #add codes for org C and P fractions
 variable_code <- variable_code %>%
   add_row(var = c("deriv_orgC","labile","ironbound"),
-          code = c("dC/dt","Labile P","Iron-bound P"))
+          code = c("dC/dt","Labile P","Fe-bound P"))
 
 
 ###change master data to have pretty column names
@@ -45,24 +45,25 @@ name_map <- setNames(variable_code$code, variable_code$var)
 # rename columns in the dataset
 master_dat_v3 <- master_dat_v2 %>%
   rename_with(~ name_map[.x], .cols = names(name_map))
+colnames(master_dat_v3)
 
 ## --------------------------------------------------------------------------- ##
 ## ---------------------------- strat plots ---------------------------------- ##
 ## --------------------------------------------------------------------------- ##
 
 lakes = unique(master_dat_v2$lake)
-pretty_lake_names = c("Burnt","Dunnigan","East Twin","Elbow","Finger","Flame","Smoke","West Twin")
+pretty_lake_names = c("(c) Burnt","(a) Dunnigan","(f) East Twin","(e) Elbow","(b) Finger","(g) Flame","(d) Smoke","(h) West Twin")
 
 for (i in 1:length(lakes)){
 # Select data for strat plots
 vars_code <- imp_variables %>% filter(lake==lakes[i]) %>% select(var) %>% pull()
 
 lake_dat <- master_dat_v3 %>% filter(lake==lakes[i]) %>%
-  select(year_loess,all_of(vars_code),`dC/dt`,`Labile P`,`Iron-bound P`)
+  select(year_loess,all_of(vars_code),`dC/dt`,`Labile P`,`Fe-bound P`)
 
 #CONISS
 #get column numbers to skip
-col_names_to_skip <- c("year_loess","dC/dt","Labile P","Iron-bound P")
+col_names_to_skip <- c("year_loess","dC/dt","Labile P","Fe-bound P")
 col_n_to_skip <- which(names(lake_dat) %in% col_names_to_skip)
 #distance matrix  
 dist.mat <- vegdist(lake_dat[,-c(col_n_to_skip)],method="euclidian", binary=FALSE, diag=FALSE, upper=FALSE, na.rm=T)
@@ -74,11 +75,11 @@ n_cluster_lines <- n_cluster[which(n_cluster$dispersion<n_cluster$bstick, arr.in
 
 #create a vector of colors based on variable type
 var_colors <- imp_variables %>% filter(lake==lakes[i]) %>% select(type)
-var_colors <- var_colors %>% mutate(color = case_when(type=="diatom"~"#b69d05",
-                                                      type=="pigment"~"#86a72c"))
+var_colors <- var_colors %>% mutate(color = case_when(type=="diatom"~"#b39dd0",
+                                                      type=="pigment"~"#96c068"))
 strat_colors <- c(#colors for bio vars,
   var_colors$color,
-  rep("#bc5090",3) #for the three geochem vars
+  rep("#edeff0",3) #for the three geochem vars
   )
 
 #run this to save plot
@@ -86,7 +87,7 @@ file = paste0("Bio proxy CONISS/Bio proxy CONISS - v3/",lakes[i],"_strat_coniss.
 
 pdf(
   file=file,
-  width=11,height=8.5
+  width=11,height=7
 )
 
 lake.strat.plot <- 
