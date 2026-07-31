@@ -9,6 +9,9 @@ librarian::shelf(tidyverse, readxl,rioja,vegan)
 getwd()
 setwd("/Users/lsethna/Documents/GitHub/wildernesslakes_paleo_pfractions") #change this to match local GitHub folder
 
+#create date stamp for file exports
+date <- format(Sys.Date(),format="%d%b%y")
+
 ## ----------------------------------- ##
 # Read in data ----
 ## ----------------------------------- ##
@@ -30,6 +33,7 @@ glimpse(master_dat_v2)
 ## get variables from PCoA
 imp_variables <- read.csv("Paleo PCoA/sig_variables_pcoa_by_lake_17Jul26.csv")
 glimpse(imp_variables)
+unique(imp_variables$var)
 
 #get codes to change imp_variables back to match var names in master data
 variable_code <- read.csv("Paleo PCoA/pcoa_variable_abbr.csv") %>% select(!X)
@@ -47,12 +51,16 @@ master_dat_v3 <- master_dat_v2 %>%
   rename_with(~ name_map[.x], .cols = names(name_map))
 colnames(master_dat_v3)
 
+write.csv(master_dat_v3,file=paste0("Bio proxy CONISS/interp_paleo_var_for_CONISS_",date,".csv"))
+
 ## --------------------------------------------------------------------------- ##
 ## ---------------------------- strat plots ---------------------------------- ##
 ## --------------------------------------------------------------------------- ##
 
 lakes = unique(master_dat_v2$lake)
 pretty_lake_names = c("(c) Burnt","(a) Dunnigan","(f) East Twin","(e) Elbow","(b) Finger","(g) Flame","(d) Smoke","(h) West Twin")
+#list to store zone boundary years
+zone_boundary_years <- list()
 
 for (i in 1:length(lakes)){
 # Select data for strat plots
@@ -61,7 +69,7 @@ vars_code <- imp_variables %>% filter(lake==lakes[i]) %>% select(var) %>% pull()
 lake_dat <- master_dat_v3 %>% filter(lake==lakes[i]) %>%
   select(year_loess,all_of(vars_code),`dC/dt`,`Labile P`,`Fe-bound P`)
 
-#CONISS
+#### CONISS ###
 #get column numbers to skip
 col_names_to_skip <- c("year_loess","dC/dt","Labile P","Fe-bound P")
 col_n_to_skip <- which(names(lake_dat) %in% col_names_to_skip)
@@ -72,6 +80,21 @@ chclust.obj <- rioja::chclust(dist.mat,method="coniss")
 #optimal number of clusters
 n_cluster <- rioja::bstick(chclust.obj)
 n_cluster_lines <- n_cluster[which(n_cluster$dispersion<n_cluster$bstick, arr.ind=TRUE)[1],] %>% select(nGroups) %>% pull()
+
+### pull out the years of the significant zone boundaries ###
+#assign each sample to a zone, based on the optimal number of clusters
+zone_membership <- cutree(chclust.obj, k = n_cluster_lines)
+
+#lake_dat is in the same row order as zone_membership (both derived from the same
+#filtered/ordered data), so a change in zone id between consecutive rows marks a boundary
+boundary_idx <- which(diff(zone_membership) != 0)
+
+#take the midpoint year between the two samples flanking each boundary as the "date of change"
+boundary_years <- (lake_dat$year_loess[boundary_idx] + lake_dat$year_loess[boundary_idx + 1]) / 2
+
+#save to the list, keyed by lake name
+zone_boundary_years[[i]] <- data.frame(lake = lakes[i],
+                                       boundary_years = boundary_years)
 
 #create a vector of colors based on variable type
 var_colors <- imp_variables %>% filter(lake==lakes[i]) %>% select(type)
@@ -90,7 +113,7 @@ pdf(
   width=11,height=7
 )
 
-lake.strat.plot <- 
+lake.strat.plot <-
 strat.plot(lake_dat[,-1],yvar=lake_dat$year_loess, #[rows,col]
            y.tks=seq(plyr::round_any(min(lake_dat$year_loess),10),2020,10),
            plot.poly=T,plot.bar=T,col.poly=strat_colors,
@@ -103,3 +126,7 @@ addClustZone(lake.strat.plot, chclust.obj, nZone=n_cluster_lines, lwd=1.5, lty=2
 dev.off() #clear before rerunning next lake
 
 }
+
+### export zone boundary years
+zone_boundary_years_df <- dplyr::bind_rows(zone_boundary_years)
+write.csv(zone_boundary_years_df,file=paste0("Bio proxy CONISS/zone_boundary_years_CONISS_",date,".csv"))

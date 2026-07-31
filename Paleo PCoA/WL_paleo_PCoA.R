@@ -87,8 +87,8 @@ pretty_names <- function(x) {
 pretty_name_code <- tibble(var = colnames(master_v3_interp)) %>% 
   mutate(code = case_when(var %in% diat_pig_vars ~ pretty_names(var), #change only diatoms and pigments
                           T ~ var)) %>%
-  #manually change BCA to BCAR
-  mutate(code = case_when(code=="BCA" ~ "BCAR",
+  mutate(code = case_when(code=="BCA" ~ "BCAR", #manually change BCA to BCAR
+                          code=="PHAB" ~ "PHEB", #manually change PHAB to PHEB
                           T ~ code))
 
 #check to make sure all codes are unique
@@ -524,7 +524,7 @@ write.csv(pcoa.variable.vectors.lake,file=paste0("Paleo PCoA/sig_variables_pcoa_
 ## plot up PCoA loadings over time for each lake
 pcoa.scores_lake_df <- dplyr::bind_rows(pcoa.scores_lake)
 glimpse(pcoa.scores_lake_df)
-#write.csv(pcoa.scores_lake_df,file="PCoA_scores_by_lake.csv")
+write.csv(pcoa.scores_lake_df,file=paste0("PCoA_scores_by_lake_",date,".csv"))
 
 pcoa.scores_lake_df %>%
 #change lake names and order
