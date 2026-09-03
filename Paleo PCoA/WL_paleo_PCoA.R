@@ -197,9 +197,13 @@ site_scores %>%
   mutate(lake = factor(lake,levels=c("dunnigan","finger","burnt","smoke","elbow","etwin","flame","wtwin"),
                        labels=c("Dunnigan","Finger","Burnt","Smoke","Elbow","East Twin","Flame","West Twin"))
          ) %>%
+  mutate(mix_regime = case_when(lake=="Dunnigan"|lake=="Finger" ~ "well",
+                                lake=="West Twin"|lake=="Flame" ~ "di",
+                                T ~ "poly")) %>%
+  
 ggplot(aes(PCoA1, PCoA2)) +  
   #lake trajectories 
-  geom_path(aes(color=lake), size=0.75, 
+  geom_path(aes(color=lake,lty=mix_regime), size=0.75, 
             arrow=arrow(type="closed", ends="first",length=unit(0.1,"inches")), 
             lineend="round") + 
   #vectors
@@ -207,8 +211,8 @@ ggplot(aes(PCoA1, PCoA2)) +
                aes(x = 0, y = 0, xend = Dim1, yend = Dim2),
                color = "#7b7b7b",size=0.5) +
   geom_point(data = vecs_scaled,
-             aes(x = Dim1, y = Dim2, fill = type),
-             size = 3, pch = 21) +
+             aes(x = Dim1, y = Dim2),
+             size = 3, pch = 23) +
   geom_text_repel(data = vecs_scaled,
             aes(x = Dim1, y = Dim2, label = varname),
             size = 4,
@@ -219,17 +223,27 @@ ggplot(aes(PCoA1, PCoA2)) +
        color = "Lake",fill="Variable type") +
   # scale_x_continuous(limits=c(-0.75,0.75))+
   # scale_y_continuous(limits=c(-0.75,0.75))+
-  scale_color_manual(values=c("#ffa600", #Dunnigan
-                              "#fbddbe", #Finger
-                              "#52d4b2", #Burnt
-                              "#81dec3", #Smoke
-                              "#a8e8d3", #Elbow
-                              "#baeddc", #East Twin
-                              "#c285ff", #Flame
-                              "#e5c6ff" #West Twin
+  scale_color_manual(values=c("#980B83",
+                              "#f464df",
+                              #Dunnigan
+                              #, #Finger
+                              "#122135",
+                              #"#4c7c9b",
+                              #86b0cc",
+                              "#3968A6",
+                              "#7199CE",
+                              #"#52d4b2", #Burnt
+                              #"#81dec3", #Smoke
+                              #"#a8e8d3", #Elbow
+                              "#B8CCE7", #East Twin
+                              "#ffa600",
+                              "#FFD586"
+                              #"#c285ff", #Flame
+                              #"#e5c6ff" #West Twin
                               
   )) +
-  scale_fill_manual(values=c("#b39dd0","#96c068")) +
+  scale_linetype_manual(values=c("longdash","solid","dotted"))+
+  #scale_fill_manual(values=c("#b39dd0","#96c068")) +
   theme_classic(base_size=14) 
 
 dev.off()
@@ -484,21 +498,21 @@ for (i in 1:length(lakes)) {
                  aes(x = 0, y = 0, xend = Dim1, yend = Dim2),
                  color = "gray40") +
     geom_point(data = vecs_scaled,
-               aes(x = Dim1, y = Dim2, fill = type),
-               size = 3, pch = 21) +
+               aes(x = Dim1, y = Dim2, shape=type),
+               size = 3) +
     geom_text_repel(data = vecs_scaled,
               aes(x = Dim1, y = Dim2, label = varname),
               size =3,
               direction="both") +
     #general aesthetics
     labs(x = paste0("PCoA Axis 1 (",round(var_explained[1]*100,1),"%)"), 
-         y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)"), 
-         fill="Variable type") +
+         y = paste0("PCoA Axis 2 (",round(var_explained[2]*100,1),"%)")) +
     ggtitle(lake_plot_titles[i]) +
     #normalize axes to allow for comparisons between lakes
     scale_x_continuous(limits=c(-1,1))+
     scale_y_continuous(limits=c(-1,1))+
-    scale_fill_manual(values=c("#b39dd0","#96c068")) +
+    #scale_fill_manual(values=c("#b39dd0","#96c068")) +
+    scale_shape_manual(values=c(23,21))+
     theme_classic(base_size=14)+
     theme(legend.position="none")
   
