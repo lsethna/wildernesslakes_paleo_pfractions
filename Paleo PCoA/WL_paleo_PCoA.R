@@ -223,23 +223,23 @@ ggplot(aes(PCoA1, PCoA2)) +
        color = "Lake",fill="Variable type") +
   # scale_x_continuous(limits=c(-0.75,0.75))+
   # scale_y_continuous(limits=c(-0.75,0.75))+
-  scale_color_manual(values=c("#980B83",
-                              "#f464df",
-                              #Dunnigan
-                              #, #Finger
-                              "#122135",
+  scale_color_manual(values=c("#980B83",#Dunnigan
+                              "#f464df",#, #Finger
+                              
+                              
+                              "#122135", #Burnt
                               #"#4c7c9b",
                               #86b0cc",
-                              "#3968A6",
-                              "#7199CE",
-                              #"#52d4b2", #Burnt
-                              #"#81dec3", #Smoke
-                              #"#a8e8d3", #Elbow
-                              "#B8CCE7", #East Twin
-                              "#ffa600",
-                              "#FFD586"
-                              #"#c285ff", #Flame
-                              #"#e5c6ff" #West Twin
+                              "#3968A6", #Smoke
+                              "#7199CE", #Flame
+                              #"#52d4b2", 
+                              #"#81dec3", 
+                              #"#a8e8d3", 
+                              "#B8CCE7", #Elbow
+                              "#ffa600", #Flame
+                              "#FFD586" #West Twin
+                              #"#c285ff", 
+                              #"#e5c6ff" 
                               
   )) +
   scale_linetype_manual(values=c("longdash","solid","dotted"))+
