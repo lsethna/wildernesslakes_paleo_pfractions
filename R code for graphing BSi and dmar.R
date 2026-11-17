@@ -159,7 +159,7 @@ recode_lake <- function(x) {
 }
 
 recode_name <- function(x) {
-  case_when(x=="flux_mg" ~ paste("BSi flux (mg cm","\u207b\u00b2"," yr\u207b\u00b9"),
+  case_when(x=="flux_mg" ~ paste("BSi flux (mg cm","\u207b\u00b2"," yr\u207b\u00b9)"),
             x=="wt_percent" ~ "BSi weight %",
             TRUE ~ x)
 }
@@ -197,6 +197,19 @@ plot_dat %>%
         panel.grid = element_blank(),
         axis.title = element_blank())
 
+
+## summary of slopes by mixing regime
+label_dat %>% mutate(mix_regime = case_when(lake == "West Twin" | lake == "Flame" ~ "di",
+                                            lake == "Dunnigan" | lake == "Finger" ~ "well",
+                                            T ~ "poly")) %>%
+  select(mix_regime,name,slope,r.squared,p.value) %>%
+  filter(name == paste("BSi flux (mg cm","\u207b\u00b2"," yr\u207b\u00b9)")) %>%
+  group_by(mix_regime) %>%
+  summarize(
+    n=n(),
+    avg.slope = mean(slope),
+    se.slope = sd(slope)/sqrt(n)
+  )
 
 #DMAR vs Date
 library(readxl)

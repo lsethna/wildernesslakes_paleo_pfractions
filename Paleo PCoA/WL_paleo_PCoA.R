@@ -29,7 +29,7 @@ sel_diat <- master_dat %>% select(colnames(master_dat[,c(56:269)])) %>%
 sel_p <- master_dat %>% select(colnames(master_dat[,24:55])) %>% 
   summarize(across(chlide_a:car_z,max,na.rm=T))
 sel_pig <- sel_p %>% 
-  select(!c("sudan","chl_c1","chl_c2","fuco","diadino","chl_b","chl_a","chl_ap",contains("sed"))) %>% #remove unstable or non-interpretable pigments
+  select(!c("sudan","chl_c1","chl_c2","fuco","diadino","chl_b","chl_ap",contains("sed"))) %>% #remove unstable or non-interpretable pigments
   pivot_longer(cols=chlide_a:car_z) %>% 
   filter(value>0) #remove any non-detect pigments
 sel_pig
@@ -548,7 +548,7 @@ mutate(lake = factor(lake,levels=c("dunnigan","finger","burnt","smoke","elbow","
 ggplot(aes(x=year,y=X1,color=lake))+
   #geom_vline(xintercept = 1900,lty="dashed")+
   #geom_vline(xintercept = 1970,lty="dashed")+
-  geom_smooth(se=F,span=0.3)+ #span - smaller numbers produce wigglier lines, larger numbers produce smoother lines
+  geom_smooth(se=F,span=0.7)+ #span - smaller numbers produce wigglier lines, larger numbers produce smoother lines
   scale_color_manual(values=c("#ffa600", #Dunnigan
                               "#fbddbe", #Finger
                               "#52d4b2", #Burnt
