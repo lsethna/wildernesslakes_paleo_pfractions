@@ -67,125 +67,169 @@ zone_boundary_years <- list()
 # list to store plots
 strat_plot_list <- list()
 
-for (i in 1:length(lakes)){
-# Select data for strat plots
-vars_code <- imp_variables %>% filter(lake==lakes[i]) %>% select(var) %>% pull()
-
-lake_dat <- master_dat_v3 %>% filter(lake==lakes[i]) %>%
-  select(year_loess,all_of(vars_code),`chl-a:pheo-a`,`dC/dt`,`Labile P`,`Fe-bound P`)
-
-#### CONISS ###
-#get column numbers to skip
-col_names_to_skip <- c("year_loess","chl-a:pheo-a","dC/dt","Labile P","Fe-bound P")
-col_n_to_skip <- which(names(lake_dat) %in% col_names_to_skip)
-#distance matrix  
-dist.mat <- vegdist(lake_dat[,-c(col_n_to_skip)],method="euclidian", binary=FALSE, diag=FALSE, upper=FALSE, na.rm=T)
-#coniss cluster
-chclust.obj <- rioja::chclust(dist.mat,method="coniss")
-#optimal number of clusters
-n_cluster <- rioja::bstick(chclust.obj)
-n_cluster_lines <- n_cluster[which(n_cluster$dispersion<n_cluster$bstick, arr.ind=TRUE)[1],] %>% select(nGroups) %>% pull()
-
-### pull out the years of the significant zone boundaries ###
-#assign each sample to a zone, based on the optimal number of clusters
-zone_membership <- cutree(chclust.obj, k = n_cluster_lines)
-
-#lake_dat is in the same row order as zone_membership (both derived from the same
-#filtered/ordered data), so a change in zone id between consecutive rows marks a boundary
-boundary_idx <- which(diff(zone_membership) != 0)
-
-#take the midpoint year between the two samples flanking each boundary as the "date of change"
-boundary_years <- (lake_dat$year_loess[boundary_idx] + lake_dat$year_loess[boundary_idx + 1]) / 2
-
-#save to the list, keyed by lake name
-zone_boundary_years[[i]] <- data.frame(lake = lakes[i],
-                                       boundary_years = boundary_years)
-
-#create a vector of colors based on variable type
-var_colors <- imp_variables %>% filter(lake==lakes[i]) %>% select(type)
-var_colors <- var_colors %>% mutate(color = case_when(type=="diatom"~"#919191",
-                                                      type=="pigment"~"#d6d6d6"))
-strat_colors <- c(#colors for bio vars,
-  var_colors$color,
-  rep("#f0f0f0",4) #for the preservation index + three geochem vars
-  )
-
-strat_plot_list[[i]] <- local({
-  dat_i <- lake_dat
-  cols_i <- strat_colors
-  title_i <- pretty_lake_names[i]
-  clust_i <- chclust.obj
-  n_lines_i <- n_cluster_lines
+for (i in 1:length(lakes)) {
   
-  # Generate clean year breaks within the dated range of this specific lake
-  y_breaks <- pretty(dat_i$year_loess, n = 6)
-  # # Keep only breaks above the min of the core so axis doesn't overhang
-  y_breaks <- y_breaks[y_breaks >= min(dat_i$year_loess, na.rm = TRUE)]
-
-  cowplot::ggdraw(function() {
-    par(oma = c(0, 0, 0, 0))
-    
-    sp <- strat.plot(
-      dat_i[, -1],
-      yvar = dat_i$year_loess,
-      y.tks = y_breaks,
-      plot.poly = TRUE,
-      plot.bar = TRUE,
-      col.poly = cols_i,
-      srt.xlabel = 45,
-      title = "",
-      # Shorten the stratigraphic body vertically so text/labels get more room
-      yTop = 0.64,
-      yBottom = 0.14,
-      xLeft = 0.14,
-      xRight = 0.98,
-      las = 2,
-      # Tighten label-to-axis distance: c(title, tick_labels, axis_line)
-      mgp = c(2.2, 0.5, 0),
-      xSpace = 0.02,
-      # Larger text sizes relative to a 8.5 x 9.5 in page
-      cex.ylabel = 0.75,
-      cex.xlabel = 0.75,
-      # Smaller x-axis scale numbers and shorter tick marks
-      cex.axis = 0.6,
-      tcl = -0.25
-    )
-    addClustZone(sp, clust_i, nZone = n_lines_i, lwd = 1.2, lty = 2, col = "grey25")
-  }) +
-    cowplot::draw_plot_label(
-      label = title_i,
-      x = 0.14,          # Matches xLeft
-      y = 0.96,          # Sits right above the rotated column headers
-      hjust = 0,
-      vjust = 1,
-      size = 11,
-      fontface = "bold"
-    )
-})
-
+  # 1. Select data for strat plots
+  vars_code <- imp_variables %>% filter(lake == lakes[i]) %>% select(var) %>% pull()
+  
+  lake_dat <- master_dat_v3 %>% 
+    filter(lake == lakes[i]) %>%
+    select(year_loess, all_of(vars_code), `chl-a:pheo-a`, `dC/dt`, `Fe-bound P`, `Labile P`)
+  
+  # 2. CONISS clustering
+  col_names_to_skip <- c("year_loess", "chl-a:pheo-a", "dC/dt", "Fe-bound P", "Labile P")
+  col_n_to_skip <- which(names(lake_dat) %in% col_names_to_skip)
+  
+  dist.mat <- vegdist(lake_dat[, -c(col_n_to_skip)], method = "euclidian",
+                      binary = FALSE, diag = FALSE, upper = FALSE, na.rm = TRUE)
+  chclust.obj <- rioja::chclust(dist.mat, method = "coniss")
+  
+  n_cluster <- rioja::bstick(chclust.obj)
+  n_cluster_lines <- n_cluster[which(n_cluster$dispersion < n_cluster$bstick, arr.ind = TRUE)[1], ] %>%
+    select(nGroups) %>% pull()
+  
+  zone_membership <- cutree(chclust.obj, k = n_cluster_lines)
+  boundary_idx <- which(diff(zone_membership) != 0)
+  boundary_years <- (lake_dat$year_loess[boundary_idx] + lake_dat$year_loess[boundary_idx + 1]) / 2
+  
+  zone_boundary_years[[i]] <- data.frame(lake = lakes[i],
+                                         boundary_years = boundary_years)
+  
+  # 3. Map variable types and fill colors
+  var_types <- imp_variables %>% 
+    filter(lake == lakes[i]) %>% 
+    select(var, type) %>%
+    bind_rows(tibble(
+      var = c("chl-a:pheo-a", "dC/dt", "Fe-bound P", "Labile P"),
+      type = rep("geochem", 4)
+    ))
+  
+  # Preserve exact column order from lake_dat
+  var_order <- colnames(lake_dat)[-1]
+  
+  # 4. Pivot longer for ggplot
+  lake_long <- lake_dat %>%
+    pivot_longer(
+      cols = -year_loess,
+      names_to = "var",
+      values_to = "value"
+    ) %>%
+    left_join(var_types, by = "var") %>%
+    mutate(
+      var = factor(var, levels = var_order),
+      fill_col = case_when(
+        type == "diatom"  ~ "#919191",
+        type == "pigment" ~ "#d6d6d6",
+        type == "geochem" ~ "#ffffff"
+      )
+    ) %>%
+    arrange(var, year_loess)
+  
+  # 5. Control y-axis breaks & bounds (min inside core, top capped at 2020)
+  y_min <- min(lake_dat$year_loess, na.rm = TRUE)
+  y_breaks <- pretty(c(y_min, 2020), n = 5)
+  y_breaks <- y_breaks[y_breaks >= y_min & y_breaks <= 2020]
+  y_top_limit <- 2020
+  
+  # 6. Build ggplot stratigraphic diagram
+  p <- ggplot(lake_long, aes(y = year_loess)) +
+    # Interpolated area polygon (orientation = "y" fills horizontally from 0 to value)
+    geom_ribbon(
+      aes(xmin = pmin(0, value, na.rm = TRUE),
+          xmax = pmax(0, value, na.rm = TRUE),
+          fill = fill_col),
+      orientation = "y",
+      color = "black",
+      linewidth = 0.25,
+      na.rm = TRUE
+    ) +
+    # Horizontal sample bars
+    geom_segment(
+      aes(x = 0, xend = value, yend = year_loess),
+      color = "black",
+      linewidth = 0.25,
+      na.rm = TRUE
+    ) +
+    # CONISS zone boundary lines
+    geom_hline(
+      yintercept = boundary_years,
+      linetype = "dashed",
+      color = "grey25",
+      linewidth = 0.45
+    ) +
+    scale_fill_identity() +
+    # Clean x-axis: upper and lower bounds on column
+    scale_x_continuous(
+      breaks = function(limits) {
+        # Keep 0 and the largest pretty break inside the data range
+        b <- pretty(limits, n = 2)
+        b <- b[b >= limits[1] & b <= limits[2]]
+        if (length(b) > 2) b[c(1, length(b))] else b
+      },
+      expand = expansion(mult = c(0.05, 0.08))
+    ) +
+    # Exact y-axis control: bottom locked to y_min, top extends to highest y_break
+    scale_y_continuous(
+      limits = c(y_min, y_top_limit),
+      breaks = y_breaks,
+      expand = expansion(mult = c(0.01, 0.01))
+    ) +
+    facet_grid(~ var, scales = "free_x") +
+    labs(
+      title = pretty_lake_names[i],
+      x = NULL,
+      y = NULL
+    ) +
+    theme_classic(base_size = 9) +
+    theme(
+      # Title close to the rotated facet labels
+      plot.title = element_text(size = 10, face = "plain", hjust = 0, margin = margin(b = 2)),
+      # Rotated 45-degree variable names at top of each column
+      strip.background = element_blank(),
+      strip.placement = "outside",
+      strip.clip = "off",
+      strip.text.x = element_text(
+        angle = 45,
+        hjust = 0,
+        vjust = 0,
+        size = 7.5,
+        margin = margin(b = 2, l = 2)
+      ),
+      # Rotated 45-degree x-axis numbers & short ticks
+      axis.text.x = element_text(angle=90, hjust=1, vjust=1, size=6.5, color="black"),
+      axis.text.y = element_text(size=7.5, color="black"),
+      axis.ticks.length = unit(2, "pt"),
+      axis.line = element_line(linewidth=0.3),
+      axis.ticks = element_line(linewidth=0.3),
+      # Spacing between stratigraphic columns within the lake
+      panel.spacing.x = unit(5, "pt"),
+      # Outer margin around each lake panel (now actually responds!)
+      plot.margin = margin(t=6, r=8, b=6, l=6, unit="pt")
+    ) +
+    coord_cartesian(clip="off")
+  
+  strat_plot_list[[i]] <- p
 }
 
 
 ## create facet plot
 # Reorder list so panels appear (a) through (h) left-to-right, top-to-bottom
-# Reorder panels (a) through (h)
 panel_order <- order(pretty_lake_names)
 ordered_plots <- strat_plot_list[panel_order]
 
 # Use 'scale' (0.90 to 0.98) to adjust whitespace between all 8 panels
 panels_grid <- cowplot::plot_grid(
   plotlist = ordered_plots,
-  ncol = 2,
-  nrow = 4,
-  scale = 0.94
+  ncol=2,
+  nrow=4
 )
 
-# Save to PDF 8.5 x 10.5 inch dimensions
+# Save to PDF (base dimensions in inches)
 cowplot::save_plot(
   filename = paste0("Bio proxy CONISS/Bio proxy CONISS - v4/All_Lakes_strat_coniss_", date, ".pdf"),
   plot = panels_grid,
-  base_width = 8.5,
-  base_height = 10.5
+  base_width = 6.5,
+  base_height = 8.5
 )
 
 ### export zone boundary years
